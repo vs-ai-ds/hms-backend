@@ -11,22 +11,23 @@ wheels/
 
 # Environments
 .venv
+
 # Byte-code files
 *.py[cod]
 
 # IDEs
-.vscode/                # VS Code settings and launch configs
+.vscode/
 
 # Environment Variables
-.env                    # Sensitive environment variables
+.env
 
 
 # Testing
-.pytest_cache/          # pytest cache directory
+.pytest_cache/ 
 
 # Alembic
-alembic/versions/*.pyc  # Compiled Alembic migration files
-alembic.db              # Any temporary database file used by alembic for testing
+alembic/versions/*.pyc
+alembic.db
 
 # OS Generated Files
 Thumbs.db 
