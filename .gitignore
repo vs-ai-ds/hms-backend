@@ -1,0 +1,35 @@
+# Python
+__pycache__
+*.pyc
+*.pyd
+*.pyo
+.Python
+build/
+dist/
+var/
+wheels/
+
+# Environments
+.venv
+# Byte-code files
+*.py[cod]
+
+# IDEs
+.vscode/                # VS Code settings and launch configs
+
+# Environment Variables
+.env                    # Sensitive environment variables
+
+
+# Testing
+.pytest_cache/          # pytest cache directory
+
+# Alembic
+alembic/versions/*.pyc  # Compiled Alembic migration files
+alembic.db              # Any temporary database file used by alembic for testing
+
+# OS Generated Files
+Thumbs.db 
+
+#clean up folder
+cleanup_s/
