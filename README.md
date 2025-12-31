@@ -8,35 +8,16 @@ This project was created as part of **HackArena 2.0 by Masaiverse x Platform Com
 
 ## 🔗 Related Repositories
 
-- **[Frontend Repository](../Frontend/README.md)** - React-based frontend application
+- **[Frontend Repository](https://github.com/vs-ai-ds/hms-frontend)** - React-based frontend application
 - **Backend Repository** (this repository) - FastAPI-based backend API
 
-> **Note:** If these are separate repositories, update the links above to point to the actual GitHub repository URLs.
 
 ## 🌐 Live Demo
 
 [![Backend Live](https://img.shields.io/badge/Backend-API-blue)](https://hms-backend-5z1l.onrender.com/)
 
-[![Frontend Live](https://img.shields.io/badge/Frontend-Live-green)](https://hms.varunanalytics.com/)
+[![Frontend Live](https://img.shields.io/badge/Frontend-Live-green)](https://hms-backend-5z1l.onrender.com/)
 
----
-
-## 📸 Screenshots
-
-### API Documentation
-
-📚 Swagger UI — Interactive API documentation
-![Swagger API documentation](docs/screenshots/swagger-ui.png)
-
-📖 ReDoc — Alternative API documentation
-![ReDoc API documentation](docs/screenshots/redoc-ui.png)
-
-### Database Architecture
-
-🗄️ Schema Diagram — Multi-tenant database architecture
-![Database schema diagram](docs/screenshots/database-schema.png)
-
----
 
 ## ✨ Features
 
@@ -259,6 +240,9 @@ This project was created as part of **HackArena 2.0 by Masaiverse x Platform Com
 - **Activate/Suspend Tenants**: Manage tenant status
 - **Reset Admin Password**: Reset tenant admin passwords
 - **Tenant Metrics**: Platform-wide statistics
+- **User Limits**: Set maximum number of users per tenant
+- **Patient Limits**: Set maximum number of patients per tenant
+
 
 #### Platform Features
 - **Multi-Tenant Administration**: Manage all tenants
@@ -477,6 +461,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 1. Connect your GitHub repository to Render
 2. Create a new Web Service
+3. Pre-Deploy Command: `python -m scripts.setup_platform --init-metrics --ensure-super-admin`
 3. Set build command: `pip install -r requirements.txt && alembic upgrade head`
 4. Set start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. Add environment variables in Render dashboard
@@ -957,19 +942,20 @@ For issues, questions, or contributions, please open an issue on GitHub.
 
 ## 🔒 Security & Code Quality
 
-### Recent Improvements
+- **Automatic Security Updates:** Dependencies monitored and updated regularly with Dependabot.
+- **Vulnerability Audits:** Run `pip-audit` and `safety` in CI to catch vulnerable packages.
+- **Environment Variables:** Sensitive configurations loaded via environment variables.
+- **Input Validation:** All endpoints validate and sanitize inputs using Pydantic models.
+- **Authentication:** Secure JWT authentication with token expiry and refresh.
+- **Authorization:** Role-based access enforced at the route and resource level.
+- **Secure Headers:** HTTP security headers provided via FastAPI middleware.
+- **Error Handling:** Custom exception handlers avoid information leakage.
+- **Testing:** 100% code coverage target, with automated unit/integration tests.
+- **Linting & Formatting:** Uses `ruff`, `black`, and `isort` on every commit/PR.
+- **Static Analysis:** Type-checking (`mypy`) and vulnerability scanning in CI.
+- **Secrets Management:** No secrets hard-coded; use `.env` files or cloud secret managers.
 
-- ✅ Enhanced multi-tenant architecture
-- ✅ Improved demo data management with relationship preservation
-- ✅ Added comprehensive patient sharing
-- ✅ Enhanced prescription workflow with stock integration
-- ✅ Improved appointment lifecycle management
-- ✅ Added IPD admission management
-- ✅ Enhanced role-based access control
-- ✅ Improved error handling and validation
-- ✅ Added comprehensive API documentation
-- ✅ Enhanced notification system
-- ✅ Improved database migrations
+Please see [SECURITY.md](SECURITY.md) for full practices and responsible disclosure process.
 
-**Last Updated:** January 2025
 
+**Last Updated:** December 2025
