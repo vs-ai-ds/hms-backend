@@ -16,7 +16,7 @@ This project was created as part of **HackArena 2.0 by Masaiverse x Platform Com
 
 [![Backend Live](https://img.shields.io/badge/Backend-API-blue)](https://hms-backend-5z1l.onrender.com/)
 
-[![Frontend Live](https://img.shields.io/badge/Frontend-Live-green)](https://hms-backend-5z1l.onrender.com/)
+[![Frontend Live](https://img.shields.io/badge/Frontend-Live-green)](https://hms-backend-5z1l.onrender.com/redoc)
 
 
 ## ✨ Features
