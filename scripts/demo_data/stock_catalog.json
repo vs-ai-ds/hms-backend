@@ -1,0 +1,25 @@
+{
+  "medicines": [
+    {"name":"Paracetamol","generic_name":"Paracetamol","form":"Tablet","strength":"500 mg","route":"oral","default_dosage":"1 tab","default_frequency":"BD","default_duration":"3 days","default_instructions":"After food"},
+    {"name":"Amoxicillin","generic_name":"Amoxicillin","form":"Capsule","strength":"250 mg","route":"oral","default_dosage":"1 cap","default_frequency":"TDS","default_duration":"5 days","default_instructions":"After food"},
+    {"name":"Cetirizine","generic_name":"Cetirizine","form":"Tablet","strength":"10 mg","route":"oral","default_dosage":"1 tab","default_frequency":"HS","default_duration":"5 days","default_instructions":"At bedtime"},
+    {"name":"Pantoprazole","generic_name":"Pantoprazole","form":"Tablet","strength":"40 mg","route":"oral","default_dosage":"1 tab","default_frequency":"OD","default_duration":"7 days","default_instructions":"Before breakfast"},
+    {"name":"Azithromycin","generic_name":"Azithromycin","form":"Tablet","strength":"500 mg","route":"oral","default_dosage":"1 tab","default_frequency":"OD","default_duration":"3 days","default_instructions":"After food"},
+    {"name":"ORS Sachet","generic_name":"Oral Rehydration Salts","form":"Sachet","strength":"21 g","route":"oral","default_dosage":"As directed","default_frequency":"PRN","default_duration":"2 days","default_instructions":"Dissolve in 1L water"},
+    {"name":"Salbutamol","generic_name":"Salbutamol","form":"Inhaler","strength":"100 mcg","route":"inhalation","default_dosage":"2 puffs","default_frequency":"PRN","default_duration":"5 days","default_instructions":"Use with spacer if needed"}
+  ],
+  "equipment": [
+    {"name":"BP Monitor (Digital)"},
+    {"name":"Glucometer"},
+    {"name":"Pulse Oximeter"},
+    {"name":"Thermometer (Digital)"},
+    {"name":"Stethoscope"}
+  ],
+  "consumables": [
+    {"name":"Syringe 5ml"},
+    {"name":"Gauze Pad"},
+    {"name":"Bandage رول"},
+    {"name":"Cotton Roll"},
+    {"name":"IV Cannula 20G"}
+  ]
+}

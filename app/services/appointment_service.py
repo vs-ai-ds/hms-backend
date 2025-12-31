@@ -1,6 +1,6 @@
 # app/services/appointment_service.py
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ def list_appointments(
     *,
     from_date: datetime | None = None,
     to_date: datetime | None = None,
-    doctor_id: UUID | None = None,
+    doctor_user_id: UUID | None = None,
     status: AppointmentStatus | None = None,
 ) -> list[Appointment]:
     """
@@ -20,8 +20,8 @@ def list_appointments(
     """
     query = db.query(Appointment)
 
-    if doctor_id is not None:
-        query = query.filter(Appointment.doctor_id == doctor_id)
+    if doctor_user_id is not None:
+        query = query.filter(Appointment.doctor_user_id == doctor_user_id)
     if status is not None:
         query = query.filter(Appointment.status == status)
     if from_date is not None:

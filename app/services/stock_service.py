@@ -1,5 +1,4 @@
 # app/services/stock_service.py
-from uuid import UUID
 
 from sqlalchemy.orm import Session
 

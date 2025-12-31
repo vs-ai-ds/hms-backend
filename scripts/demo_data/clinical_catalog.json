@@ -1,0 +1,29 @@
+{
+  "opd_complaints": [
+    {"complaint":"Fever with body ache","diagnosis":"Viral fever","dept":"General Medicine"},
+    {"complaint":"Cough and sore throat","diagnosis":"Upper respiratory infection","dept":"General Medicine"},
+    {"complaint":"Headache and nausea","diagnosis":"Migraine","dept":"General Medicine"},
+    {"complaint":"Stomach pain after meals","diagnosis":"Gastritis","dept":"General Medicine"},
+    {"complaint":"Shortness of breath on exertion","diagnosis":"Bronchitis","dept":"General Medicine"},
+    {"complaint":"Child with runny nose and mild fever","diagnosis":"Common cold","dept":"Pediatrics"},
+    {"complaint":"Child with loose stools","diagnosis":"Acute gastroenteritis","dept":"Pediatrics"},
+    {"complaint":"Chest discomfort and palpitations","diagnosis":"Anxiety / rule out cardiac cause","dept":"Cardiology"},
+    {"complaint":"High BP follow-up","diagnosis":"Hypertension","dept":"Cardiology"},
+    {"complaint":"Burning urination","diagnosis":"Urinary tract infection","dept":"General Medicine"}
+  ],
+  "ipd_reasons": [
+    {"reason":"Community acquired pneumonia","dept":"General Medicine"},
+    {"reason":"Dengue with low platelets","dept":"Emergency"},
+    {"reason":"Acute exacerbation of asthma","dept":"Emergency"},
+    {"reason":"Uncontrolled hypertension","dept":"Cardiology"},
+    {"reason":"Dehydration requiring IV fluids","dept":"Emergency"},
+    {"reason":"Cellulitis requiring IV antibiotics","dept":"General Medicine"}
+  ],
+  "cancel_notes": [
+    "Patient requested reschedule due to travel.",
+    "Doctor unavailable; advised new slot.",
+    "Converted to IPD admission from OPD.",
+    "Patient did not arrive within grace period."
+  ],
+  "languages": ["English","Hindi"]
+}

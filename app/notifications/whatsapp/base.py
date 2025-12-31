@@ -23,12 +23,8 @@ def send_whatsapp(
     debug_reason = f" [{reason}]" if reason else ""
 
     if not settings.whatsapp_enabled:
-        print(
-            f"[WHATSAPP DISABLED{debug_reason}] To: {phone}, Message: {message}"
-        )
+        print(f"[WHATSAPP DISABLED{debug_reason}] To: {phone}, Message: {message}")
         return
 
     # TODO: integrate provider API here.
-    print(
-        f"[WHATSAPP SENT{debug_reason}] To: {phone}, Message: {message}"
-    )
+    print(f"[WHATSAPP SENT{debug_reason}] To: {phone}, Message: {message}")

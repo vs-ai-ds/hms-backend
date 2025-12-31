@@ -1,6 +1,6 @@
 # app/schemas/document.py
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ class DocumentBase(BaseModel):
     patient_id: UUID
     file_name: str
     mime_type: str | None = None
+    document_type: str | None = None
     storage_path: str
 
 

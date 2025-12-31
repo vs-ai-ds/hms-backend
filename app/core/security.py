@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
@@ -25,10 +25,11 @@ def create_access_token(
     subject: str | int,
     tenant_id: str | None,
     roles: list[str],
+    permissions: list[str] | None = None,
     expires_delta_minutes: int | None = None,
 ) -> str:
     """
-    Create a JWT access token with subject (user id), tenant_id and roles.
+    Create a JWT access token with subject (user id), tenant_id, roles, and permissions.
     """
     if expires_delta_minutes is None:
         expires_delta_minutes = settings.access_token_expire_minutes
@@ -38,6 +39,7 @@ def create_access_token(
         "sub": str(subject),
         "tenant_id": tenant_id,
         "roles": roles,
+        "permissions": permissions or [],
         "exp": expire,
     }
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
@@ -45,8 +47,16 @@ def create_access_token(
 
 
 def decode_token(token: str) -> dict[str, Any]:
+    """
+    Decode and validate a JWT token.
+    Raises ValueError with descriptive message if token is invalid or expired.
+    """
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
     except JWTError as exc:
+        # Check if it's an expiration error
+        error_str = str(exc).lower()
+        if "expired" in error_str or "exp" in error_str:
+            raise ValueError("Token has expired. Please log in again.") from None
         raise ValueError("Invalid token") from exc
     return payload

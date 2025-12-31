@@ -17,20 +17,19 @@ wheels/
 
 # IDEs
 .vscode/
+.ruff_cache/
+uploads/
 
 # Environment Variables
 .env
-
 
 # Testing
 .pytest_cache/ 
 
 # Alembic
 alembic/versions/*.pyc
-alembic.db
-
-# OS Generated Files
-Thumbs.db 
 
 #clean up folder
 cleanup_s/
+tests/
+uploads/

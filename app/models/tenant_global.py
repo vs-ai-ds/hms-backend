@@ -4,9 +4,10 @@ from enum import Enum as PyEnum
 
 from sqlalchemy import (
     Column,
-    String,
     DateTime,
     Enum,
+    Integer,
+    String,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -29,28 +30,21 @@ class Tenant(Base):
     Stored in the public schema so the platform (SUPER_ADMIN)
     can see and manage all tenants.
     """
-    __tablename__ = "tenants"
 
+    __tablename__ = "tenants"
+    __table_args__ = {"schema": "public"}
+
+    # Primary Key
     id = Column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
         nullable=False,
     )
+
+    # Business Identifiers
     name = Column(String(255), nullable=False)
-    address = Column(String(500), nullable=True)
-
-    contact_email = Column(String(255), nullable=False)
-    contact_phone = Column(String(50), nullable=True)
-
     license_number = Column(String(100), nullable=False, unique=True)
-
-    status = Column(
-        Enum(TenantStatus, name="tenant_status_enum"),
-        nullable=False,
-        server_default=text("'PENDING'"),
-    )
-
     schema_name = Column(
         String(100),
         nullable=False,
@@ -58,6 +52,29 @@ class Tenant(Base):
         doc="PostgreSQL schema name for this tenant (e.g. tenant_ab12cd34)",
     )
 
+    # Contact Information
+    contact_email = Column(String(255), nullable=False)
+    contact_phone = Column(String(50), nullable=True)
+    address = Column(String(500), nullable=True)
+
+    # Status and Configuration
+    status = Column(
+        Enum(TenantStatus, name="tenant_status_enum"),
+        nullable=False,
+        server_default=text("'PENDING'"),
+    )
+    max_users = Column(
+        Integer,
+        nullable=True,
+        doc="Maximum number of users allowed for this tenant (null = unlimited)",
+    )
+    max_patients = Column(
+        Integer,
+        nullable=True,
+        doc="Maximum number of patients allowed for this tenant (null = unlimited)",
+    )
+
+    # Timestamps
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

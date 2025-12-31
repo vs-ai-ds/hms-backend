@@ -1,0 +1,17 @@
+{
+  "first_names": [
+    "Aarav","Aditi","Akash","Alok","Aman","Ananya","Aniket","Anjali","Ankit","Arjun",
+    "Bhavna","Chaitanya","Deepak","Divya","Farhan","Gaurav","Ishita","Karan","Kavita","Kiran",
+    "Mahesh","Meera","Mohit","Neha","Nikhil","Pooja","Priya","Rahul","Raj","Rakesh",
+    "Riya","Rohit","Sanjay","Shalini","Shreya","Sneha","Suresh","Swati","Varun","Vikram",
+    "Yash","Zoya"
+  ],
+  "last_names": [
+    "Agarwal","Bansal","Chopra","Desai","Gupta","Iyer","Jain","Joshi","Kapoor","Khan",
+    "Kumar","Malhotra","Mehta","Mishra","Nair","Pandey","Patel","Rao","Reddy","Shah",
+    "Sharma","Singh","Srivastava","Tiwari","Verma","Yadav"
+  ],
+  "relations": ["Father","Mother","Spouse","Sibling","Son","Daughter","Friend","Neighbour"],
+  "blood_groups": ["A+","A-","B+","B-","AB+","AB-","O+","O-"],
+  "marital_status": ["Single","Married","Divorced","Widowed"]
+}

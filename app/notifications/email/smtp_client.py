@@ -12,6 +12,7 @@ def send_via_smtp(
     to_email: str,
     subject: str,
     body: str,
+    attachments: list[dict] | None = None,
 ) -> None:
     """
     Minimal SMTP client using Python's standard library.
@@ -21,12 +22,29 @@ def send_via_smtp(
         - settings.email_smtp_port
         - settings.email_smtp_username
         - settings.email_smtp_password
+
+    attachments: List of dicts with 'filename' and 'content' (bytes)
     """
     msg = EmailMessage()
     msg["From"] = from_email
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.set_content(body)
+
+    # Check if body is HTML
+    if body.strip().startswith("<!DOCTYPE html") or body.strip().startswith("<html"):
+        msg.set_content(body, subtype="html")
+    else:
+        msg.set_content(body)
+
+    # Add attachments
+    if attachments:
+        for att in attachments:
+            msg.add_attachment(
+                att["content"],
+                maintype="application",
+                subtype="pdf",
+                filename=att["filename"],
+            )
 
     host = settings.email_smtp_host
     port = settings.email_smtp_port

@@ -1,0 +1,22 @@
+{
+  "cities": [
+    {"city":"Mumbai","state":"Maharashtra","postal_code":"400001"},
+    {"city":"Delhi","state":"Delhi","postal_code":"110001"},
+    {"city":"Bengaluru","state":"Karnataka","postal_code":"560001"},
+    {"city":"Hyderabad","state":"Telangana","postal_code":"500001"},
+    {"city":"Chennai","state":"Tamil Nadu","postal_code":"600001"},
+    {"city":"Kolkata","state":"West Bengal","postal_code":"700001"},
+    {"city":"Pune","state":"Maharashtra","postal_code":"411001"},
+    {"city":"Ahmedabad","state":"Gujarat","postal_code":"380001"},
+    {"city":"Jaipur","state":"Rajasthan","postal_code":"302001"},
+    {"city":"Lucknow","state":"Uttar Pradesh","postal_code":"226001"}
+  ],
+  "streets": [
+    "MG Road","Station Road","Gandhi Nagar","Civil Lines","Model Town","Sector 21",
+    "Park Street","Link Road","Ring Road","Nehru Marg","Rajiv Chowk","Lake View Road"
+  ],
+  "localities": [
+    "Andheri","Borivali","Indiranagar","Banjara Hills","Velachery","Salt Lake",
+    "Koregaon Park","Navrangpura","Malviya Nagar","Gomti Nagar"
+  ]
+}

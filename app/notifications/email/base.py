@@ -12,41 +12,52 @@ def send_email(
     body: str,
     *,
     reason: Optional[str] = None,
+    html: bool = False,
+    attachments: list[dict] | None = None,
 ) -> None:
     """
-    Email sending stub / basic implementation.
+    Unified email sending abstraction supporting SMTP and Resend.
 
     - If email_sandbox_mode is True:
-        all emails are sent to EMAIL_TEST_RECIPIENT (if set),
-        and we just log.
+        all emails are sent to EMAIL_TEST_RECIPIENT (if set).
     - Otherwise:
-        delegate to smtp_client.send_via_smtp (simple SMTP client).
+        uses EMAIL_BACKEND to choose between SMTP and Resend.
     """
-    from app.notifications.email.smtp_client import send_via_smtp
-
     debug_reason = f" [{reason}]" if reason else ""
 
+    # Apply sandbox mode
+    actual_recipient = to_email
     if settings.email_sandbox_mode:
-        recipient = settings.email_test_recipient or settings.email_from
+        actual_recipient = str(settings.email_test_recipient or settings.email_from)
         print(
             f"[EMAIL SANDBOX{debug_reason}] "
-            f"To: {recipient}, Subject: {subject!r}"
+            f"Original: {to_email}, Redirected to: {actual_recipient}, Subject: {subject!r}"
         )
-        # Optionally still send via SMTP to test_recipient
+
+    # Choose backend
+    if settings.email_backend.lower() == "resend":
+        from app.notifications.email.resend_client import send_via_resend
+
+        send_via_resend(
+            from_email=str(settings.email_from),
+            to_email=actual_recipient,
+            subject=subject,
+            html_body=body if html else f"<pre>{body}</pre>",
+            attachments=attachments,
+        )
+    else:
+        from app.notifications.email.smtp_client import send_via_smtp
+
         send_via_smtp(
             from_email=str(settings.email_from),
-            to_email=str(recipient),
+            to_email=actual_recipient,
             subject=subject,
             body=body,
+            attachments=attachments,
         )
-        return
 
-    print(
-        f"[EMAIL SEND{debug_reason}] To: {to_email}, Subject: {subject!r}"
-    )
-    send_via_smtp(
-        from_email=str(settings.email_from),
-        to_email=to_email,
-        subject=subject,
-        body=body,
-    )
+    # Print success message
+    if settings.email_sandbox_mode:
+        print(f"[EMAIL SANDBOX SENT{debug_reason}] To: {actual_recipient} (original: {to_email}), Subject: {subject!r}")
+    else:
+        print(f"[EMAIL SENT{debug_reason}] To: {actual_recipient}, Subject: {subject!r}")

@@ -1,5 +1,5 @@
 # app/background/tasks.py
-from typing import Callable, Any
+from typing import Any, Callable
 
 from fastapi import BackgroundTasks
 

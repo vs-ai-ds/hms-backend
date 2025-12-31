@@ -2,7 +2,6 @@
 import os
 import uuid
 from pathlib import Path
-from typing import Tuple
 
 from app.core.config import get_settings
 
