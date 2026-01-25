@@ -106,10 +106,14 @@ _seed_settings = get_settings()
 #   which reduces the chance of "cached plan must not change result type" in psycopg3.
 # - With Supabase transaction pooler, search_path must be transaction-local (we handle that below).
 _seed_engine = create_engine(
-    str(_seed_settings.database_url),
+    str(_seed_settings.get_database_url(purpose="ddl")),
     future=True,
     pool_pre_ping=True,
     poolclass=NullPool,
+    connect_args={
+        "prepare_threshold": 0,
+        "statement_cache_size": 0,
+    },
 )
 
 SeedSessionLocal = sessionmaker(
@@ -1430,6 +1434,7 @@ def freshen_demo_for_tenant(db: Session, tenant: Tenant, suffix: str, shift_days
 def seed_one_tenant(spec: DemoTenantSpec) -> None:
     """Seed one tenant using a fresh Session/connection."""
     db = SeedSessionLocal()
+    db.rollback()
     try:
         print(f"\n=== Seeding Tenant {spec.suffix} ===")
         tenant = get_or_create_demo_tenant(db, spec)

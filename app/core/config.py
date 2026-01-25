@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
+    database_url_direct: str | None = None  # Optional: use direct (5432) for DDL/seed/migrations
 
     # Redis
     redis_url: str | None = None
@@ -115,6 +116,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    def get_database_url(self, *, purpose: str = "app") -> str:
+        """
+        Returns the best DB URL for the given purpose.
+        - purpose="app": normal runtime (pooler is OK)
+        - purpose="ddl": schema/table/type creation, seeding, migrations (prefer direct)
+        """
+        if purpose == "ddl" and self.database_url_direct:
+            return self.database_url_direct
+        return self.database_url
+
 
 @lru_cache()
 def get_settings() -> Settings:
@@ -149,3 +160,4 @@ def get_settings() -> Settings:
             raise ValueError("EMAIL_SMTP_HOST is required when EMAIL_BACKEND=smtp but not set in .env file")
 
     return settings
+
