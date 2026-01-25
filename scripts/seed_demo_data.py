@@ -39,7 +39,6 @@ Run:
   python -m scripts.seed_demo_data --reset
   python -m scripts.seed_demo_data --freshen --freshen-days 7
 """
-
 from __future__ import annotations
 
 import argparse
@@ -54,6 +53,7 @@ from pathlib import Path
 from typing import Any, Generator
 
 from sqlalchemy import String, cast, create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -95,6 +95,7 @@ DEMO_TENANT_B_LICENSE = "DEMO-TENANT-B-011"
 DEMO_EMAIL_TLD = "hms"
 
 DATA_DIR = REPO_ROOT / "scripts" / "demo_data"
+
 # ----------------------------
 # Engine / Session for seeding
 # ----------------------------
@@ -103,6 +104,7 @@ _seed_settings = get_settings()
 # Notes:
 # - NullPool is deliberate here: it avoids connection reuse across different tenants/schemas,
 #   which reduces the chance of "cached plan must not change result type" in psycopg3.
+# - With Supabase transaction pooler, search_path must be transaction-local (we handle that below).
 _seed_engine = create_engine(
     str(_seed_settings.database_url),
     future=True,
@@ -119,6 +121,54 @@ SeedSessionLocal = sessionmaker(
 )
 
 # ----------------------------
+# Pooler-safe schema switching
+# ----------------------------
+def _set_search_path_local(db: Session, path: str) -> None:
+    """
+    Pooler-safe way to set search_path.
+    set_config(..., true) makes it LOCAL to the current transaction.
+    Works reliably with Supabase transaction pooler.
+    """
+    db.execute(text("SELECT set_config('search_path', :p, true)"), {"p": path})
+
+
+@contextmanager
+def public_scope(db: Session) -> Generator[None, None, None]:
+    """
+    Ensure all ORM work inside uses *public* schema (transaction-local).
+    """
+    try:
+        _set_search_path_local(db, "public")
+        yield
+    except Exception:
+        db.rollback()
+        raise
+
+
+@contextmanager
+def tenant_scope(db: Session, schema_name: str) -> Generator[None, None, None]:
+    """
+    Ensure all ORM work inside uses tenant schema (transaction-local).
+    Defensive: rolls back on error to avoid "transaction aborted" cascades.
+    """
+    try:
+        _set_search_path_local(db, f'"{schema_name}", public')
+        yield
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _log_db_error(e: Exception) -> None:
+    """
+    Emit the underlying DB error (very useful on Render).
+    """
+    logger.error("Seed failed: %s", e, exc_info=True)
+    if isinstance(e, SQLAlchemyError) and getattr(e, "orig", None) is not None:
+        logger.error("DBAPI orig: %r", e.orig)
+
+
+# ----------------------------
 # Helpers
 # ----------------------------
 def _run_public_metrics(work) -> None:
@@ -127,15 +177,15 @@ def _run_public_metrics(work) -> None:
     """
     dbm: Session = SeedSessionLocal()
     try:
-        # Make sure we are on public for the whole metrics operation.
-        dbm.execute(text("SET search_path TO public"))
-        work(dbm)
+        with public_scope(dbm):
+            work(dbm)
         dbm.commit()
     except Exception:
         dbm.rollback()
         raise
     finally:
         dbm.close()
+
 
 def _column_exists(db: Session, schema: str, table: str, column: str) -> bool:
     q = text(
@@ -150,33 +200,35 @@ def _column_exists(db: Session, schema: str, table: str, column: str) -> bool:
     )
     return db.execute(q, {"schema": schema, "table": table, "column": column}).first() is not None
 
+
 def demo_email(suffix: str, username: str) -> str:
     return f"{username}@demo-tenant-{suffix.lower()}.{DEMO_EMAIL_TLD}"
 
+
 def demo_tag(suffix: str, entity: str, ident: str) -> str:
-    # A stable marker we can query in reset/freshen.
     return f"DEMO|{suffix}|{entity}|{ident}"
+
 
 def load_json(name: str) -> dict[str, Any]:
     path = DATA_DIR / name
     return json.loads(path.read_text(encoding="utf-8"))
 
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
 
 def in_15_min_block(dt: datetime) -> datetime:
     minute = (dt.minute // 15) * 15
     return dt.replace(minute=minute, second=0, microsecond=0)
 
+
 def clinic_time(now: datetime, days_offset: int) -> datetime:
-    """
-    Pick a clinic-hours datetime in 15-minute blocks.
-    Default window: 08:00-18:45.
-    """
     base = now + timedelta(days=days_offset)
     hour = random.randint(8, 18)
     minute = random.choice([0, 15, 30, 45])
     return in_15_min_block(base.replace(hour=hour, minute=minute))
+
 
 def choose_weighted(items: list[tuple[Any, float]]) -> Any:
     r = random.random()
@@ -187,14 +239,13 @@ def choose_weighted(items: list[tuple[Any, float]]) -> Any:
             return val
     return items[-1][0]
 
+
 def rand_phone(i: int) -> str:
-    # Looks human-ish but deterministic enough for idempotency
     base = 9000000000 + (i * 137) % 900000000
     return f"+91-{base:010d}"
 
 
 def rand_dob() -> date | None:
-    # Mix of known DOB and unknown
     if random.random() < 0.22:
         return None
     years = random.randint(1, 78)
@@ -210,85 +261,62 @@ def _safe_setattr(obj: Any, field: str, value: Any) -> None:
         setattr(obj, field, value)
 
 
-@contextmanager
-def tenant_scope(db: Session, schema_name: str) -> Generator[None, None, None]:
-    """
-    Ensure all ORM work inside the block runs against the tenant schema.
-
-    Critical detail:
-    - Adding ORM objects inside this scope is not enough.
-    - If the actual INSERT happens later (during commit/autoflush) after we restore search_path,
-      you'll see errors like: "relation user_roles does not exist".
-
-    So for tenant-scoped writes, we flush *inside* the scope when needed.
-    """
-    conn = db.connection()
-    original: str | None = None
-    try:
-        try:
-            original = conn.execute(text("SHOW search_path")).scalar()
-        except Exception:
-            original = None
-
-        conn.execute(text(f'SET search_path TO "{schema_name}", public'))
-        yield
-    finally:
-        if original:
-            try:
-                conn.execute(text(f"SET search_path TO {original}"))
-            except Exception:
-                # If restore fails, we don't want to hide the original error.
-                pass
-
 @dataclass(frozen=True)
 class DemoTenantSpec:
     suffix: str  # "A" / "B"
     license_number: str
     admin_email: str
 
+
 # ----------------------------
 # Tenant setup
 # ----------------------------
 def get_or_create_demo_tenant(db: Session, spec: DemoTenantSpec) -> Tenant:
-    existing = db.query(Tenant).filter(Tenant.license_number == spec.license_number).first()
-    if existing:
-        if existing.status != TenantStatus.ACTIVE:
-            existing.status = TenantStatus.ACTIVE
+    """
+    Tenant row + schema/table creation are global/public concerns.
+    Minimums (roles/depts/etc.) are tenant-schema concerns.
+    """
+    with public_scope(db):
+        existing = db.query(Tenant).filter(Tenant.license_number == spec.license_number).first()
+
+        if existing:
+            if existing.status != TenantStatus.ACTIVE:
+                existing.status = TenantStatus.ACTIVE
+                db.commit()
+
+            from app.services.tenant_service import ensure_tenant_tables_exist  # type: ignore
+            ensure_tenant_tables_exist(db, existing.schema_name)
+
+            with tenant_scope(db, existing.schema_name):
+                ensure_tenant_minimums(db)
+
             db.commit()
+            return existing
 
-        # Make sure tenant tables exist (helpful for half-created tenants)
+        loc = load_json("locations_in.json")
+        city = random.choice(loc["cities"])
+        street = random.choice(loc["streets"])
+
+        tenant = register_tenant(
+            db=db,
+            name=f"Demo Hospital {spec.suffix}",
+            address=f"Plot 12, {street}, {city['city']}, {city['state']} {city['postal_code']}",
+            contact_email=spec.admin_email,
+            contact_phone=rand_phone(1 if spec.suffix == "A" else 2),
+            license_number=spec.license_number,
+        )
+        tenant.status = TenantStatus.ACTIVE
+        db.flush()
+
         from app.services.tenant_service import ensure_tenant_tables_exist  # type: ignore
-        ensure_tenant_tables_exist(db, existing.schema_name)
+        ensure_tenant_tables_exist(db, tenant.schema_name)
 
-        # Minimums must exist (roles, departments, permissions etc.)
-        with tenant_scope(db, existing.schema_name):
+        with tenant_scope(db, tenant.schema_name):
             ensure_tenant_minimums(db)
+
         db.commit()
-        return existing
+        return tenant
 
-    loc = load_json("locations_in.json")
-    city = random.choice(loc["cities"])
-    street = random.choice(loc["streets"])
-
-    tenant = register_tenant(
-        db=db,
-        name=f"Demo Hospital {spec.suffix}",
-        address=f"Plot 12, {street}, {city['city']}, {city['state']} {city['postal_code']}",
-        contact_email=spec.admin_email,
-        contact_phone=rand_phone(1 if spec.suffix == "A" else 2),
-        license_number=spec.license_number,
-    )
-    tenant.status = TenantStatus.ACTIVE
-    db.flush()
-
-    from app.services.tenant_service import ensure_tenant_tables_exist  # type: ignore
-    ensure_tenant_tables_exist(db, tenant.schema_name)
-
-    with tenant_scope(db, tenant.schema_name):
-        ensure_tenant_minimums(db)
-
-    db.commit()
-    return tenant
 
 def fetch_system_roles_and_departments(db: Session) -> tuple[dict[str, TenantRole], dict[str, Department]]:
     roles = db.query(TenantRole).all()
@@ -298,17 +326,21 @@ def fetch_system_roles_and_departments(db: Session) -> tuple[dict[str, TenantRol
         {d.name: d for d in depts},
     )
 
+
 # ----------------------------
 # Users + roles
 # ----------------------------
 def ensure_user_membership(db: Session, user: User, tenant: Tenant) -> None:
-    existing = (
-        db.query(UserTenant)
-        .filter(UserTenant.user_id == user.id, UserTenant.tenant_id == tenant.id)
-        .first()
-    )
-    if not existing:
-        db.add(UserTenant(user_id=user.id, tenant_id=tenant.id))
+    # user_tenants is public
+    with public_scope(db):
+        existing = (
+            db.query(UserTenant)
+            .filter(UserTenant.user_id == user.id, UserTenant.tenant_id == tenant.id)
+            .first()
+        )
+        if not existing:
+            db.add(UserTenant(user_id=user.id, tenant_id=tenant.id))
+
 
 def ensure_user_role(db: Session, user: User, role: TenantRole) -> None:
     existing = (
@@ -318,11 +350,12 @@ def ensure_user_role(db: Session, user: User, role: TenantRole) -> None:
     )
     if existing:
         return
-
     db.add(TenantUserRole(user_id=user.id, role_id=role.id))
     db.flush()
 
+
 def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict[str, User]:
+    # Roles/depts are tenant tables
     with tenant_scope(db, tenant.schema_name):
         roles_map, dept_map = fetch_system_roles_and_departments(db)
 
@@ -339,46 +372,47 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
         department: str | None,
         specialization: str | None,
     ) -> User:
-        existing = db.query(User).filter(User.email == email, User.tenant_id == tenant.id).first()
-        if existing:
-            # Keep it login-ready
-            existing.status = UserStatus.ACTIVE
-            existing.is_active = True
-            existing.is_deleted = False
-            existing.must_change_password = False
-            existing.email_verified = True
-            if not getattr(existing, "hashed_password", None):
-                existing.hashed_password = hashed
-            return existing
+        # Users live in public schema
+        with public_scope(db):
+            existing = db.query(User).filter(User.email == email, User.tenant_id == tenant.id).first()
+            if existing:
+                existing.status = UserStatus.ACTIVE
+                existing.is_active = True
+                existing.is_deleted = False
+                existing.must_change_password = False
+                existing.email_verified = True
+                if not getattr(existing, "hashed_password", None):
+                    existing.hashed_password = hashed
+                ensure_user_membership(db, existing, tenant)
+                db.flush()
+                return existing
 
-        u = User(
-            tenant_id=tenant.id,
-            email=email,
-            hashed_password=hashed,
-            first_name=first_name,
-            last_name=last_name,
-            phone=rand_phone(abs(hash(email)) % 10000),
-            department=department,
-            specialization=specialization,
-            status=UserStatus.ACTIVE,
-            is_active=True,
-            is_deleted=False,
-            must_change_password=False,
-            email_verified=True,
-        )
-        db.add(u)
-        db.flush()
-        ensure_user_membership(db, u, tenant)
-        return u
+            u = User(
+                tenant_id=tenant.id,
+                email=email,
+                hashed_password=hashed,
+                first_name=first_name,
+                last_name=last_name,
+                phone=rand_phone(abs(hash(email)) % 10000),
+                department=department,
+                specialization=specialization,
+                status=UserStatus.ACTIVE,
+                is_active=True,
+                is_deleted=False,
+                must_change_password=False,
+                email_verified=True,
+            )
+            db.add(u)
+            db.flush()
+            ensure_user_membership(db, u, tenant)
+            db.flush()
+            return u
 
     admin_dept_name = dept_map.get("Administrator").name if dept_map.get("Administrator") else "Administrator"
-    general_med_name = (
-        dept_map.get("General Medicine").name if dept_map.get("General Medicine") else "General Medicine"
-    )
+    general_med_name = dept_map.get("General Medicine").name if dept_map.get("General Medicine") else "General Medicine"
 
     users: dict[str, User] = {}
 
-    # 1 Hospital Admin
     admin_email = demo_email(spec.suffix, "admin")
     admin = mk_user(admin_email, "Hospital", "Admin", admin_dept_name, None)
     with tenant_scope(db, tenant.schema_name):
@@ -1402,11 +1436,12 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
 
         # Count existing records before seeding
         demo_email_domain = f"@demo-tenant-{spec.suffix.lower()}.{DEMO_EMAIL_TLD}"
-        existing_user_count = (
-            db.query(User)
-            .filter(User.tenant_id == tenant.id, User.email.like(f"%{demo_email_domain}"))
-            .count()
-        )
+        with public_scope(db):
+            existing_user_count = (
+                db.query(User)
+                .filter(User.tenant_id == tenant.id, User.email.like(f"%{demo_email_domain}"))
+                .count()
+            )
 
         with tenant_scope(db, tenant.schema_name):
             existing_patients_before = (
@@ -1559,8 +1594,17 @@ def seed_two_tenants() -> None:
             admin_email=demo_email("B", "admin"),
         ),
     ]
+
+    failures: list[tuple[str, str]] = []
     for spec in specs:
-        seed_one_tenant(spec)
+        try:
+            seed_one_tenant(spec)
+        except Exception as e:
+            _log_db_error(e)
+            failures.append((spec.suffix, str(e)))
+
+    if failures:
+        raise RuntimeError(f"Seed finished with failures: {failures}")
 
 
 def main() -> None:
