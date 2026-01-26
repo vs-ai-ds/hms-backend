@@ -101,19 +101,23 @@ DATA_DIR = REPO_ROOT / "scripts" / "demo_data"
 # ----------------------------
 _seed_settings = get_settings()
 
-# Notes:
-# - NullPool is deliberate here: it avoids connection reuse across different tenants/schemas,
-#   which reduces the chance of "cached plan must not change result type" in psycopg3.
-# - With Supabase transaction pooler, search_path must be transaction-local (we handle that below).
+def _is_pooler_url(url: str) -> bool:
+    return ":6543" in url or "pooler.supabase.com" in url
+
+# Prefer direct URL for seed/DDL if provided, else fallback to normal DATABASE_URL
+_seed_db_url = str(_seed_settings.get_database_url(purpose="ddl"))
+
+connect_args: dict = {}
+if _is_pooler_url(_seed_db_url):
+    connect_args["prepare_threshold"] = None
+
+# NullPool is deliberate for scripts (avoid reusing connections across schema switches).
 _seed_engine = create_engine(
-    str(_seed_settings.get_database_url(purpose="ddl")),
+    _seed_db_url,
     future=True,
     pool_pre_ping=True,
+    connect_args=connect_args,
     poolclass=NullPool,
-    connect_args={
-        "prepare_threshold": 0,
-        "statement_cache_size": 0,
-    },
 )
 
 SeedSessionLocal = sessionmaker(
