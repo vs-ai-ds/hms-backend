@@ -105,7 +105,7 @@ def _is_pooler_url(url: str) -> bool:
     return ":6543" in url or "pooler.supabase.com" in url
 
 # Prefer direct URL for seed/DDL if provided, else fallback to normal DATABASE_URL
-_seed_db_url = str(_seed_settings.get_database_url(purpose="ddl"))
+_seed_db_url = _seed_settings.database_url
 
 connect_args: dict = {}
 if _is_pooler_url(_seed_db_url):

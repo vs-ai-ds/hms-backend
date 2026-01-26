@@ -17,7 +17,6 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
-    database_url_direct: str | None = None  # Optional: use direct (5432) for DDL/seed/migrations
 
     # Redis
     redis_url: str | None = None
@@ -115,16 +114,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
-
-    def get_database_url(self, *, purpose: str = "app") -> str:
-        """
-        Returns the best DB URL for the given purpose.
-        - purpose="app": normal runtime (pooler is OK)
-        - purpose="ddl": schema/table/type creation, seeding, migrations (prefer direct)
-        """
-        if purpose == "ddl" and self.database_url_direct:
-            return self.database_url_direct
-        return self.database_url
 
 
 @lru_cache()

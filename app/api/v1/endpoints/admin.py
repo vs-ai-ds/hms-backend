@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
@@ -46,23 +47,35 @@ def _ensure_super_admin(db: Session, current_user: User) -> None:
 
 def _acquire_advisory_lock(db: Session, lock_id: int) -> bool:
     """
-    Acquire a Postgres advisory lock.
-    Returns True if lock acquired, False if already locked.
+    Try to acquire the advisory lock. Returns True if acquired, else False.
+    Must not leave the session in an aborted transaction state.
     """
     try:
-        result = db.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": lock_id}).scalar()
-        return bool(result)
+        row = db.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": lock_id}).first()
+        return bool(row[0]) if row else False
     except Exception as e:
-        logger.error(f"Failed to acquire advisory lock: {e}", exc_info=True)
+        logger.warning("Failed to acquire advisory lock (treat as not acquired): %s", e, exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return False
 
 
 def _release_advisory_lock(db: Session, lock_id: int) -> None:
     """Release a Postgres advisory lock."""
     try:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
         db.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id})
+
+    except (OperationalError, DBAPIError) as e:
+            logger.warning("Failed to release advisory lock (non-fatal): %s", e, exc_info=True)
     except Exception as e:
-        logger.warning(f"Failed to release advisory lock: {e}", exc_info=True)
+        logger.warning("Failed to release advisory lock (non-fatal): %s", e, exc_info=True)
 
 
 def _run_seed_script(action: str, freshen_days: Optional[int] = None) -> tuple[bool, str]:
@@ -152,8 +165,19 @@ def refresh_demo_data(
             detail="Action must be 'seed', 'freshen', or 'reset'",
         )
 
-    # Acquire advisory lock
-    if not _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID):
+    acquired = False
+    # Try to acquire lock (non-blocking)
+    try:
+        acquired = _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
+    except Exception as e:
+        # If lock acquisition itself fails, treat as infra error
+        logger.warning(f"Failed to acquire advisory lock: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database lock acquisition failed. Please retry.",
+        )
+
+    if not acquired:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Demo refresh already running. Please wait for the current operation to complete.",
@@ -186,8 +210,8 @@ def refresh_demo_data(
             detail="An unexpected error occurred during demo refresh. Check server logs for details.",
         )
     finally:
-        # Always release the lock
-        _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
+        if acquired:
+            _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
 
 
 def check_and_freshen_demo_on_login(db: Session) -> None:
@@ -216,8 +240,14 @@ def check_and_freshen_demo_on_login(db: Session) -> None:
         return
 
     # Try to acquire lock (non-blocking)
-    if not _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID):
-        # Another instance is doing it, skip silently
+    acquired = False
+    try:
+        acquired = _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
+    except Exception as e:
+        logger.debug(f"Demo auto-freshen skipped: lock acquire failed: {e}")
+        return
+
+    if not acquired:
         logger.debug("Demo auto-freshen skipped: lock already held by another process")
         return
 
@@ -235,5 +265,6 @@ def check_and_freshen_demo_on_login(db: Session) -> None:
     except Exception as e:
         logger.error(f"Error during demo auto-freshen: {e}", exc_info=True)
     finally:
-        _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
+        if acquired:
+            _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
 

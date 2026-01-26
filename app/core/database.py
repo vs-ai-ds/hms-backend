@@ -19,7 +19,7 @@ def _is_pooler_url(url: str) -> bool:
 
 
 # Use app URL for runtime (pooler is OK), but make it pooler-safe.
-DATABASE_URL = str(settings.get_database_url(purpose="app"))
+DATABASE_URL = settings.database_url
 
 connect_args: dict = {}
 if _is_pooler_url(DATABASE_URL):
