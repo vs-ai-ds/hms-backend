@@ -607,8 +607,10 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
 
             dob = rand_dob()
             dob_unknown = dob is None
-            consent_email = random.random() < 0.35
-            consent_sms = random.random() < 0.55
+            #consent_email = random.random() < 0.35
+            #consent_sms = random.random() < 0.55
+            consent_email = True
+            consent_sms = True
 
             p = Patient(
                 patient_code=f"{prefix}-P-{i:05d}",
