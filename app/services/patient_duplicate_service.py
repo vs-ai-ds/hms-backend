@@ -98,7 +98,10 @@ def find_duplicate_candidates(
         match_reasons = []
 
         # Phone match (weight: 0.5)
-        if normalized_phone and normalize_phone_for_match(patient.phone_primary) == normalized_phone:
+        if (
+            normalized_phone
+            and normalize_phone_for_match(patient.phone_primary) == normalized_phone
+        ):
             match_score += 0.5
             match_reasons.append("Same phone number")
 
@@ -106,7 +109,9 @@ def find_duplicate_candidates(
         name_match = patient.first_name.strip().lower() == first_name.strip().lower()
         if name_match:
             if last_name and patient.last_name:
-                last_match = patient.last_name.strip().lower() == last_name.strip().lower()
+                last_match = (
+                    patient.last_name.strip().lower() == last_name.strip().lower()
+                )
                 if last_match:
                     match_score += 0.2
                     match_reasons.append("Same first and last name")

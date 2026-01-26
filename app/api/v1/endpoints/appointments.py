@@ -21,7 +21,11 @@ from app.models.department import Department
 from app.models.patient import Patient
 from app.models.prescription import Prescription, PrescriptionStatus
 from app.models.user import User
-from app.schemas.appointment import AppointmentCreate, AppointmentListResponse, AppointmentResponse
+from app.schemas.appointment import (
+    AppointmentCreate,
+    AppointmentListResponse,
+    AppointmentResponse,
+)
 from app.schemas.appointment_actions import (
     AppointmentCancelRequest,
     AppointmentCheckInRequest,
@@ -30,7 +34,10 @@ from app.schemas.appointment_actions import (
     AppointmentRescheduleRequest,
     AppointmentStartConsultationRequest,
 )
-from app.services.notification_service import send_notification_email, send_notification_sms
+from app.services.notification_service import (
+    send_notification_email,
+    send_notification_sms,
+)
 from app.services.tenant_service import ensure_tenant_tables_exist
 from app.services.user_role_service import get_user_role_names
 from app.utils.datetime_utils import is_valid_15_minute_interval
@@ -58,7 +65,9 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 def _get_roles(db: Session, ctx: TenantContext) -> set[str]:
-    return set(get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name))
+    return set(
+        get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    )
 
 
 def _is_admin(roles: set[str]) -> bool:
@@ -89,7 +98,9 @@ def _require_doctor_or_admin(roles: set[str]) -> None:
         )
 
 
-def _require_assigned_doctor_or_admin(roles: set[str], appointment: Appointment, ctx: TenantContext) -> None:
+def _require_assigned_doctor_or_admin(
+    roles: set[str], appointment: Appointment, ctx: TenantContext
+) -> None:
     if _is_admin(roles):
         return
     if not _is_doctor(roles):
@@ -105,7 +116,11 @@ def _require_assigned_doctor_or_admin(roles: set[str], appointment: Appointment,
 
 
 def _block_if_terminal(status_value: AppointmentStatus) -> None:
-    if status_value in (AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW):
+    if status_value in (
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Appointment is already {status_value.value}. No further actions are allowed.",
@@ -190,21 +205,33 @@ def _build_appointment_response(
     }
 
     if appointment.patient:
-        apt_dict["patient_name"] = f"{appointment.patient.first_name} {appointment.patient.last_name or ''}".strip()
+        apt_dict["patient_name"] = (
+            f"{appointment.patient.first_name} {appointment.patient.last_name or ''}".strip()
+        )
         apt_dict["patient_code"] = appointment.patient.patient_code
 
     if appointment.doctor:
-        apt_dict["doctor_name"] = f"{appointment.doctor.first_name} {appointment.doctor.last_name or ''}".strip()
+        apt_dict["doctor_name"] = (
+            f"{appointment.doctor.first_name} {appointment.doctor.last_name or ''}".strip()
+        )
 
     if appointment.department_id:
         try:
-            dept = db.query(Department).filter(Department.id == appointment.department_id).first()
+            dept = (
+                db.query(Department)
+                .filter(Department.id == appointment.department_id)
+                .first()
+            )
             apt_dict["department"] = dept.name if dept else None
         except Exception:
             apt_dict["department"] = None
 
     try:
-        prescription_count = db.query(Prescription).filter(Prescription.appointment_id == appointment.id).count()
+        prescription_count = (
+            db.query(Prescription)
+            .filter(Prescription.appointment_id == appointment.id)
+            .count()
+        )
         apt_dict["has_prescription"] = prescription_count > 0
         apt_dict["prescription_count"] = prescription_count
 
@@ -260,7 +287,9 @@ def create_appointment(
         raise HTTPException(status_code=404, detail="Patient not found")
 
     if getattr(patient, "is_deceased", False):
-        raise HTTPException(status_code=400, detail="Cannot create appointment for deceased patient.")
+        raise HTTPException(
+            status_code=400, detail="Cannot create appointment for deceased patient."
+        )
 
     # Block if active admission exists
     active_admission = (
@@ -281,9 +310,13 @@ def create_appointment(
     doctor_user_id = payload.doctor_user_id
     department_id = payload.department_id
 
-    current_roles = set(get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name))
+    current_roles = set(
+        get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    )
     current_is_doctor_only = (
-        ("DOCTOR" in current_roles) and ("HOSPITAL_ADMIN" not in current_roles) and ("SUPER_ADMIN" not in current_roles)
+        ("DOCTOR" in current_roles)
+        and ("HOSPITAL_ADMIN" not in current_roles)
+        and ("SUPER_ADMIN" not in current_roles)
     )
 
     if current_is_doctor_only:
@@ -292,7 +325,11 @@ def create_appointment(
 
         if not department_id:
             if getattr(ctx.user, "department", None):
-                dept = db.query(Department).filter(Department.name == ctx.user.department).first()
+                dept = (
+                    db.query(Department)
+                    .filter(Department.name == ctx.user.department)
+                    .first()
+                )
                 if not dept:
                     raise HTTPException(
                         status_code=400,
@@ -301,7 +338,8 @@ def create_appointment(
                 department_id = dept.id
             else:
                 raise HTTPException(
-                    status_code=400, detail="Department information not available. Please contact administrator."
+                    status_code=400,
+                    detail="Department information not available. Please contact administrator.",
                 )
 
     if not doctor_user_id:
@@ -314,10 +352,14 @@ def create_appointment(
     if not doctor_user:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    doctor_roles = set(get_user_role_names(db, doctor_user, tenant_schema_name=ctx.tenant.schema_name))
+    doctor_roles = set(
+        get_user_role_names(db, doctor_user, tenant_schema_name=ctx.tenant.schema_name)
+    )
     if "DOCTOR" not in doctor_roles:
         doctor_name = (
-            f"{doctor_user.first_name} {doctor_user.last_name}".strip() or doctor_user.email or "the selected user"
+            f"{doctor_user.first_name} {doctor_user.last_name}".strip()
+            or doctor_user.email
+            or "the selected user"
         )
         raise HTTPException(
             status_code=400,
@@ -333,12 +375,15 @@ def create_appointment(
     scheduled_utc = _as_utc(payload.scheduled_at)
     now = _utcnow()
     if scheduled_utc < now:
-        raise HTTPException(status_code=400, detail="Appointment date cannot be in the past.")
+        raise HTTPException(
+            status_code=400, detail="Appointment date cannot be in the past."
+        )
 
     # Validate 15-minute interval (00, 15, 30, 45)
     if not is_valid_15_minute_interval(scheduled_utc):
         raise HTTPException(
-            status_code=422, detail="Please select a time in 15-minute steps (e.g., 08:00, 08:15, 08:30, 08:45)."
+            status_code=422,
+            detail="Please select a time in 15-minute steps (e.g., 08:00, 08:15, 08:30, 08:45).",
         )
 
     # Conflict check: same patient + same minute, status != CANCELLED
@@ -353,7 +398,10 @@ def create_appointment(
         .first()
     )
     if conflicting:
-        raise HTTPException(status_code=400, detail="An appointment already exists for this patient at this time.")
+        raise HTTPException(
+            status_code=400,
+            detail="An appointment already exists for this patient at this time.",
+        )
 
     appt = Appointment(
         patient_id=payload.patient_id,
@@ -374,7 +422,9 @@ def create_appointment(
         raise HTTPException(status_code=500, detail="Failed to create appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appt.id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appt.id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
@@ -409,8 +459,10 @@ def create_appointment(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: appointment email notification failed. apt=%s", appt.id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: appointment email notification failed. apt=%s", appt.id
+            )
 
     if patient and patient.consent_sms and patient.phone_primary:
         try:
@@ -428,11 +480,15 @@ def create_appointment(
                 reason="appointment_created",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: appointment SMS notification failed. apt=%s", appt.id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: appointment SMS notification failed. apt=%s", appt.id
+            )
 
     # 4) Build and return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 # -------------------------
@@ -442,11 +498,15 @@ def create_appointment(
 
 @router.get("", response_model=AppointmentListResponse)
 def list_appointments(
-    search: Optional[str] = Query(None, description="Search by patient name, patient_code, doctor name"),
+    search: Optional[str] = Query(
+        None, description="Search by patient name, patient_code, doctor name"
+    ),
     status: Optional[str] = Query(None, description="Comma-separated statuses"),
     date_from: Optional[date] = Query(None, description="Filter from date"),
     date_to: Optional[date] = Query(None, description="Filter to date"),
-    visit_type: Optional[str] = Query(None, description="(OPD only) kept for compatibility"),
+    visit_type: Optional[str] = Query(
+        None, description="(OPD only) kept for compatibility"
+    ),
     patient_id: Optional[UUID] = Query(None),
     doctor_user_id: Optional[UUID] = Query(None),
     department_id: Optional[UUID] = Query(None),
@@ -534,7 +594,12 @@ def list_appointments(
     offset = (page - 1) * page_size
     appointments = query.offset(offset).limit(page_size).all()
 
-    items = [AppointmentResponse(**_build_appointment_response(a, db, ctx.tenant.schema_name)) for a in appointments]
+    items = [
+        AppointmentResponse(
+            **_build_appointment_response(a, db, ctx.tenant.schema_name)
+        )
+        for a in appointments
+    ]
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -557,9 +622,14 @@ def get_appointment(
     roles = _get_roles(db, ctx)
     if _is_doctor(roles) and not _is_admin(roles) and not _is_receptionist(roles):
         if appointment.doctor_user_id != ctx.user.id:
-            raise HTTPException(status_code=403, detail="You can only view appointments assigned to you.")
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view appointments assigned to you.",
+            )
 
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 # -------------------------
@@ -595,7 +665,9 @@ def update_appointment(
     - notes (string)
     """
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     if "status" in payload:
         raise HTTPException(
@@ -625,10 +697,14 @@ def update_appointment(
         raise HTTPException(status_code=500, detail="Failed to update appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 # -------------------------
@@ -644,14 +720,18 @@ def check_in_appointment(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AppointmentResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_receptionist_or_admin(roles)
     _block_if_terminal(appointment.status)
 
     if appointment.status != AppointmentStatus.SCHEDULED:
-        raise HTTPException(status_code=400, detail="Only SCHEDULED appointments can be checked in.")
+        raise HTTPException(
+            status_code=400, detail="Only SCHEDULED appointments can be checked in."
+        )
 
     settings = get_settings()
     now = _utcnow()
@@ -659,9 +739,9 @@ def check_in_appointment(
 
     # check-in window: from grace minutes before scheduled to end-of-day (UTC day)
     window_start = scheduled - timedelta(minutes=settings.opd_checkin_grace_minutes)
-    end_of_day = datetime.combine(scheduled.date() + timedelta(days=1), datetime.min.time()).replace(
-        tzinfo=timezone.utc
-    )
+    end_of_day = datetime.combine(
+        scheduled.date() + timedelta(days=1), datetime.min.time()
+    ).replace(tzinfo=timezone.utc)
 
     if now < window_start:
         raise HTTPException(
@@ -669,7 +749,9 @@ def check_in_appointment(
             detail=f"Cannot check in more than {settings.opd_checkin_grace_minutes} minutes before scheduled time.",
         )
     if now > end_of_day:
-        raise HTTPException(status_code=400, detail="Cannot check in after end of scheduled day.")
+        raise HTTPException(
+            status_code=400, detail="Cannot check in after end of scheduled day."
+        )
 
     # 1) Commit check-in
     try:
@@ -684,7 +766,9 @@ def check_in_appointment(
         raise HTTPException(status_code=500, detail="Failed to check in appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
@@ -704,14 +788,20 @@ def check_in_appointment(
                 reason="appointment_checked_in",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: check-in SMS notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: check-in SMS notification failed. apt=%s", appointment_id
+            )
 
     # 4) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
-@router.patch("/{appointment_id}/start-consultation", response_model=AppointmentResponse)
+@router.patch(
+    "/{appointment_id}/start-consultation", response_model=AppointmentResponse
+)
 def start_consultation(
     appointment_id: UUID,
     payload: AppointmentStartConsultationRequest,
@@ -719,22 +809,31 @@ def start_consultation(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AppointmentResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_assigned_doctor_or_admin(roles, appointment, ctx)
     _block_if_terminal(appointment.status)
 
-    if appointment.status not in (AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN):
+    if appointment.status not in (
+        AppointmentStatus.SCHEDULED,
+        AppointmentStatus.CHECKED_IN,
+    ):
         raise HTTPException(
-            status_code=400, detail=f"Cannot start consultation from status {appointment.status.value}."
+            status_code=400,
+            detail=f"Cannot start consultation from status {appointment.status.value}.",
         )
 
     # Keep your current rule: only today's appointments.
     now = _utcnow()
     scheduled = _as_utc(appointment.scheduled_at)
     if scheduled.date() != now.date():
-        raise HTTPException(status_code=400, detail="Can only start consultation for appointments scheduled today.")
+        raise HTTPException(
+            status_code=400,
+            detail="Can only start consultation for appointments scheduled today.",
+        )
 
     # 1) Commit status change
     try:
@@ -749,7 +848,9 @@ def start_consultation(
         raise HTTPException(status_code=500, detail="Failed to start consultation.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
@@ -768,11 +869,16 @@ def start_consultation(
                 reason="consultation_started",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: consultation start SMS notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: consultation start SMS notification failed. apt=%s",
+                appointment_id,
+            )
 
     # 4) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 @router.patch("/{appointment_id}/complete", response_model=AppointmentResponse)
@@ -783,15 +889,21 @@ def complete_appointment(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AppointmentResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_assigned_doctor_or_admin(roles, appointment, ctx)
     _block_if_terminal(appointment.status)
 
-    if appointment.status not in (AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION):
+    if appointment.status not in (
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.IN_CONSULTATION,
+    ):
         raise HTTPException(
-            status_code=400, detail=f"Cannot complete appointment from status {appointment.status.value}."
+            status_code=400,
+            detail=f"Cannot complete appointment from status {appointment.status.value}.",
         )
 
     # Block completion if any DRAFT Rx exists
@@ -809,7 +921,9 @@ def complete_appointment(
 
         # store closure note if provided (kept)
         if getattr(payload, "closure_note", None):
-            appointment.notes = (appointment.notes or "") + f"\n[Closed without Rx: {payload.closure_note}]"
+            appointment.notes = (
+                appointment.notes or ""
+            ) + f"\n[Closed without Rx: {payload.closure_note}]"
 
         db.commit()
         ensure_search_path(db, ctx.tenant.schema_name)
@@ -818,15 +932,15 @@ def complete_appointment(
         raise HTTPException(status_code=500, detail="Failed to complete appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
     if patient and patient.consent_sms and patient.phone_primary:
         try:
-            msg = (
-                f"Appointment completed at {ctx.tenant.name} on {appointment.scheduled_at.strftime('%Y-%m-%d %H:%M')}."
-            )
+            msg = f"Appointment completed at {ctx.tenant.name} on {appointment.scheduled_at.strftime('%Y-%m-%d %H:%M')}."
             if getattr(payload, "with_rx", False):
                 msg += " Prescription issued. Please collect from pharmacy."
             send_notification_sms(
@@ -837,8 +951,10 @@ def complete_appointment(
                 reason="appointment_completed",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: completion SMS notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: completion SMS notification failed. apt=%s", appointment_id
+            )
 
     if patient and patient.consent_email and patient.email:
         try:
@@ -870,11 +986,16 @@ def complete_appointment(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: completion email notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: completion email notification failed. apt=%s",
+                appointment_id,
+            )
 
     # 4) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 @router.patch("/{appointment_id}/cancel", response_model=AppointmentResponse)
@@ -885,19 +1006,29 @@ def cancel_appointment(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AppointmentResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_receptionist_or_admin(roles)
     _block_if_terminal(appointment.status)
 
-    if appointment.status not in (AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN):
+    if appointment.status not in (
+        AppointmentStatus.SCHEDULED,
+        AppointmentStatus.CHECKED_IN,
+    ):
         raise HTTPException(
             status_code=400,
             detail=f"Cannot cancel appointment from status {appointment.status.value}.",
         )
 
-    valid_reasons = {"PATIENT_REQUEST", "ADMITTED_TO_IPD", "DOCTOR_UNAVAILABLE", "OTHER"}
+    valid_reasons = {
+        "PATIENT_REQUEST",
+        "ADMITTED_TO_IPD",
+        "DOCTOR_UNAVAILABLE",
+        "OTHER",
+    }
     if payload.reason not in valid_reasons:
         raise HTTPException(
             status_code=400,
@@ -916,7 +1047,9 @@ def cancel_appointment(
         raise HTTPException(status_code=500, detail="Failed to cancel appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notify (best-effort)
     patient = appointment.patient
@@ -950,8 +1083,10 @@ def cancel_appointment(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: cancel email notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: cancel email notification failed. apt=%s", appointment_id
+            )
 
     if patient and patient.consent_sms and patient.phone_primary:
         try:
@@ -964,11 +1099,15 @@ def cancel_appointment(
                 reason="appointment_cancelled",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: cancel SMS notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: cancel SMS notification failed. apt=%s", appointment_id
+            )
 
     # 4) Build + return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 @router.patch("/{appointment_id}/no-show", response_model=AppointmentResponse)
@@ -979,22 +1118,32 @@ def mark_no_show(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> AppointmentResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_receptionist_or_admin(roles)
     _block_if_terminal(appointment.status)
 
     if appointment.status != AppointmentStatus.SCHEDULED:
-        raise HTTPException(status_code=400, detail="Only SCHEDULED appointments can be marked as no-show.")
+        raise HTTPException(
+            status_code=400,
+            detail="Only SCHEDULED appointments can be marked as no-show.",
+        )
 
     now = _utcnow()
     scheduled = _as_utc(appointment.scheduled_at)
     if scheduled > now:
-        raise HTTPException(status_code=400, detail="Cannot mark no-show before scheduled time.")
+        raise HTTPException(
+            status_code=400, detail="Cannot mark no-show before scheduled time."
+        )
 
     if appointment.checked_in_at:
-        raise HTTPException(status_code=400, detail="Cannot mark no-show because patient is already checked in.")
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot mark no-show because patient is already checked in.",
+        )
 
     # 1) Commit no-show status
     try:
@@ -1004,10 +1153,14 @@ def mark_no_show(
         ensure_search_path(db, ctx.tenant.schema_name)
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to mark appointment as no-show.")
+        raise HTTPException(
+            status_code=500, detail="Failed to mark appointment as no-show."
+        )
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
@@ -1036,11 +1189,15 @@ def mark_no_show(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: no-show email notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: no-show email notification failed. apt=%s", appointment_id
+            )
 
     # 4) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )
 
 
 @router.patch("/{appointment_id}/reschedule", response_model=AppointmentResponse)
@@ -1059,26 +1216,35 @@ def reschedule_appointment(
     ensure_tenant_tables_exist(db, ctx.tenant.schema_name)
     ensure_search_path(db, ctx.tenant.schema_name)
 
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     roles = _get_roles(db, ctx)
     _require_receptionist_or_admin(roles)
 
     _block_if_terminal(appointment.status)
-    if appointment.status not in (AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN):
+    if appointment.status not in (
+        AppointmentStatus.SCHEDULED,
+        AppointmentStatus.CHECKED_IN,
+    ):
         raise HTTPException(
-            status_code=400, detail=f"Cannot reschedule appointment from status {appointment.status.value}."
+            status_code=400,
+            detail=f"Cannot reschedule appointment from status {appointment.status.value}.",
         )
 
     new_scheduled = _as_utc(payload.scheduled_at)
     now = _utcnow()
     if new_scheduled < now:
-        raise HTTPException(status_code=400, detail="New appointment date cannot be in the past.")
+        raise HTTPException(
+            status_code=400, detail="New appointment date cannot be in the past."
+        )
 
     # Validate 15-minute interval (00, 15, 30, 45)
     if not is_valid_15_minute_interval(new_scheduled):
         raise HTTPException(
-            status_code=422, detail="Please select a time in 15-minute steps (e.g., 08:00, 08:15, 08:30, 08:45)."
+            status_code=422,
+            detail="Please select a time in 15-minute steps (e.g., 08:00, 08:15, 08:30, 08:45).",
         )
 
     # 1) Commit reschedule
@@ -1100,7 +1266,9 @@ def reschedule_appointment(
         raise HTTPException(status_code=500, detail="Failed to reschedule appointment.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    appointment = _reload_appointment_with_relations(db, appointment_id, ctx.tenant.schema_name)
+    appointment = _reload_appointment_with_relations(
+        db, appointment_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort)
     patient = appointment.patient
@@ -1111,7 +1279,11 @@ def reschedule_appointment(
 
             dept_name = "N/A"
             if appointment.department_id:
-                dept = db.query(Department).filter(Department.id == appointment.department_id).first()
+                dept = (
+                    db.query(Department)
+                    .filter(Department.id == appointment.department_id)
+                    .first()
+                )
                 dept_name = dept.name if dept else "N/A"
 
             body_html = f"""
@@ -1139,8 +1311,11 @@ def reschedule_appointment(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: reschedule email notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: reschedule email notification failed. apt=%s",
+                appointment_id,
+            )
 
     if patient and patient.consent_sms and patient.phone_primary:
         try:
@@ -1157,8 +1332,12 @@ def reschedule_appointment(
                 reason="appointment_rescheduled",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: reschedule SMS notification failed. apt=%s", appointment_id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: reschedule SMS notification failed. apt=%s", appointment_id
+            )
 
     # 4) Return response
-    return AppointmentResponse(**_build_appointment_response(appointment, db, ctx.tenant.schema_name))
+    return AppointmentResponse(
+        **_build_appointment_response(appointment, db, ctx.tenant.schema_name)
+    )

@@ -47,9 +47,13 @@ def create_prescription(
         raise PatientNotFoundError("Patient not found")
 
     if appointment_id and admission_id:
-        raise ValueError("Prescription cannot be linked to both appointment and admission")
+        raise ValueError(
+            "Prescription cannot be linked to both appointment and admission"
+        )
     if not appointment_id and not admission_id:
-        raise ValueError("Prescription must be linked to either appointment (OPD) or admission (IPD)")
+        raise ValueError(
+            "Prescription must be linked to either appointment (OPD) or admission (IPD)"
+        )
 
     doctor_user = db.query(User).filter(User.id == doctor_user_id).first()
     if not doctor_user or not doctor_user.tenant_id:
@@ -110,7 +114,11 @@ def create_prescription(
                 db.execute(text("SET LOCAL search_path TO public"))
                 increment_prescriptions(db)
         except Exception as e:
-            logger.warning("Failed to increment prescription metrics (non-critical): %s", e, exc_info=True)
+            logger.warning(
+                "Failed to increment prescription metrics (non-critical): %s",
+                e,
+                exc_info=True,
+            )
 
         # Restore tenant path after the nested metric update
         _set_tenant_search_path(db, tenant_schema_name)
@@ -129,7 +137,11 @@ def get_prescription(db: Session, *, prescription_id: UUID) -> Prescription:
 
     prescription = (
         db.query(Prescription)
-        .options(joinedload(Prescription.patient), joinedload(Prescription.doctor), joinedload(Prescription.items))
+        .options(
+            joinedload(Prescription.patient),
+            joinedload(Prescription.doctor),
+            joinedload(Prescription.items),
+        )
         .filter(Prescription.id == prescription_id)
         .first()
     )
@@ -138,7 +150,9 @@ def get_prescription(db: Session, *, prescription_id: UUID) -> Prescription:
     return prescription
 
 
-def list_prescriptions_for_patient(db: Session, *, patient_id: UUID) -> list[Prescription]:
+def list_prescriptions_for_patient(
+    db: Session, *, patient_id: UUID
+) -> list[Prescription]:
     return (
         db.query(Prescription)
         .filter(Prescription.patient_id == patient_id)

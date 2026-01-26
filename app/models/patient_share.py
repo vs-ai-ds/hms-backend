@@ -136,9 +136,13 @@ class PatientShare(Base):
     )
     created_by: Mapped["User"] = relationship("User")
 
-    links: Mapped[list["PatientShareLink"]] = relationship("PatientShareLink", back_populates="share")
+    links: Mapped[list["PatientShareLink"]] = relationship(
+        "PatientShareLink", back_populates="share"
+    )
 
-    access_logs: Mapped[list["PatientShareAccessLog"]] = relationship("PatientShareAccessLog", back_populates="share")
+    access_logs: Mapped[list["PatientShareAccessLog"]] = relationship(
+        "PatientShareAccessLog", back_populates="share"
+    )
 
 
 class PatientShareLink(Base):
@@ -243,5 +247,7 @@ class PatientShareAccessLog(Base):
         index=True,
     )
 
-    share: Mapped["PatientShare"] = relationship("PatientShare", back_populates="access_logs")
+    share: Mapped["PatientShare"] = relationship(
+        "PatientShare", back_populates="access_logs"
+    )
     accessed_by: Mapped["User | None"] = relationship("User")

@@ -28,7 +28,11 @@ def generate_patient_code(db: Session, tenant_id: UUID) -> str:
     prefix = f"{tenant_prefix}-P-"
 
     # Query for existing codes with this prefix
-    existing_codes = db.query(Patient.patient_code).filter(Patient.patient_code.like(f"{prefix}%")).all()
+    existing_codes = (
+        db.query(Patient.patient_code)
+        .filter(Patient.patient_code.like(f"{prefix}%"))
+        .all()
+    )
 
     # Extract sequence numbers
     max_seq = 0
@@ -70,7 +74,9 @@ def generate_prescription_code(db: Session, tenant_id: UUID) -> str:
 
     # Query for existing codes with this prefix
     existing_codes = (
-        db.query(Prescription.prescription_code).filter(Prescription.prescription_code.like(f"{prefix}%")).all()
+        db.query(Prescription.prescription_code)
+        .filter(Prescription.prescription_code.like(f"{prefix}%"))
+        .all()
     )
 
     # Extract sequence numbers

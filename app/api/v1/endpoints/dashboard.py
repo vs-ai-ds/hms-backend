@@ -85,7 +85,9 @@ def get_dashboard_metrics(
 
         metrics_row = db.query(TenantMetrics).first()
         if not metrics_row:
-            logger.error("tenant_metrics row not found. Run: python -m scripts.setup_platform")
+            logger.error(
+                "tenant_metrics row not found. Run: python -m scripts.setup_platform"
+            )
             return DashboardMetrics(
                 patients_today=0,
                 upcoming_appointments=0,
@@ -151,7 +153,9 @@ def get_dashboard_metrics(
     else:
         trends_start_date = today_start - timedelta(days=7)
 
-    role_names = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    role_names = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in role_names
     is_pharmacist = "PHARMACIST" in role_names
     is_receptionist = "RECEPTIONIST" in role_names
@@ -160,15 +164,24 @@ def get_dashboard_metrics(
 
     # Optional nurse dept filter
     nurse_department_id = None
-    if is_nurse and getattr(ctx.user, "department", None) and not (is_admin or is_receptionist or is_doctor):
+    if (
+        is_nurse
+        and getattr(ctx.user, "department", None)
+        and not (is_admin or is_receptionist or is_doctor)
+    ):
         from app.models.department import Department
 
-        dept = db.query(Department).filter(Department.name == ctx.user.department).first()
+        dept = (
+            db.query(Department).filter(Department.name == ctx.user.department).first()
+        )
         if dept:
             nurse_department_id = dept.id
 
     patients_today = (
-        db.query(func.count(Patient.id)).filter(func.date(Patient.created_at) == today_start.date()).scalar() or 0
+        db.query(func.count(Patient.id))
+        .filter(func.date(Patient.created_at) == today_start.date())
+        .scalar()
+        or 0
     )
 
     appointments_today = (
@@ -193,7 +206,9 @@ def get_dashboard_metrics(
     )
 
     prescriptions_today = (
-        db.query(func.count(Prescription.id)).filter(func.date(Prescription.created_at) == today_start.date()).scalar()
+        db.query(func.count(Prescription.id))
+        .filter(func.date(Prescription.created_at) == today_start.date())
+        .scalar()
         or 0
     )
 
@@ -207,11 +222,17 @@ def get_dashboard_metrics(
         or 0
     )
 
-    active_ipd_query = db.query(func.count(Admission.id)).filter(Admission.status == AdmissionStatus.ACTIVE)
+    active_ipd_query = db.query(func.count(Admission.id)).filter(
+        Admission.status == AdmissionStatus.ACTIVE
+    )
     if is_doctor and not is_admin:
-        active_ipd_query = active_ipd_query.filter(Admission.primary_doctor_user_id == ctx.user.id)
+        active_ipd_query = active_ipd_query.filter(
+            Admission.primary_doctor_user_id == ctx.user.id
+        )
     elif nurse_department_id is not None:
-        active_ipd_query = active_ipd_query.filter(Admission.department_id == nurse_department_id)
+        active_ipd_query = active_ipd_query.filter(
+            Admission.department_id == nurse_department_id
+        )
     active_ipd_admissions = active_ipd_query.scalar() or 0
 
     # OPD breakdown (today)
@@ -233,10 +254,16 @@ def get_dashboard_metrics(
     opd_completed_today = _opd_count(AppointmentStatus.COMPLETED)
 
     pending_prescriptions_draft = (
-        db.query(func.count(Prescription.id)).filter(Prescription.status == PrescriptionStatus.DRAFT).scalar() or 0
+        db.query(func.count(Prescription.id))
+        .filter(Prescription.status == PrescriptionStatus.DRAFT)
+        .scalar()
+        or 0
     )
     pending_prescriptions_issued = (
-        db.query(func.count(Prescription.id)).filter(Prescription.status == PrescriptionStatus.ISSUED).scalar() or 0
+        db.query(func.count(Prescription.id))
+        .filter(Prescription.status == PrescriptionStatus.ISSUED)
+        .scalar()
+        or 0
     )
 
     my_appointments_today = 0
@@ -257,7 +284,9 @@ def get_dashboard_metrics(
             db.query(func.count(Prescription.id))
             .filter(
                 Prescription.doctor_user_id == ctx.user.id,
-                Prescription.status.in_([PrescriptionStatus.DRAFT, PrescriptionStatus.ISSUED]),
+                Prescription.status.in_(
+                    [PrescriptionStatus.DRAFT, PrescriptionStatus.ISSUED]
+                ),
             )
             .scalar()
             or 0
@@ -277,7 +306,10 @@ def get_dashboard_metrics(
     prescriptions_to_dispense = 0
     if is_pharmacist or is_admin:
         prescriptions_to_dispense = (
-            db.query(func.count(Prescription.id)).filter(Prescription.status == PrescriptionStatus.ISSUED).scalar() or 0
+            db.query(func.count(Prescription.id))
+            .filter(Prescription.status == PrescriptionStatus.ISSUED)
+            .scalar()
+            or 0
         )
 
     low_stock_items_count = 0
@@ -303,18 +335,26 @@ def get_dashboard_metrics(
         .group_by(Prescription.status)
         .all()
     )
-    prescriptions_by_status = {(s.value if hasattr(s, "value") else str(s)): c for s, c in rx_by_status_rows}
+    prescriptions_by_status = {
+        (s.value if hasattr(s, "value") else str(s)): c for s, c in rx_by_status_rows
+    }
 
     # Trends: appointment outcomes only
     outcomes_q = (
         db.query(Appointment.status, func.count(Appointment.id).label("count"))
         .filter(
             Appointment.status.in_(
-                [AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]
+                [
+                    AppointmentStatus.COMPLETED,
+                    AppointmentStatus.CANCELLED,
+                    AppointmentStatus.NO_SHOW,
+                ]
             )
         )
         .filter(Appointment.scheduled_at >= trends_start_date)
-        .filter(Appointment.linked_ipd_admission_id.is_(None))  # Only OPD appointments (exclude IPD)
+        .filter(
+            Appointment.linked_ipd_admission_id.is_(None)
+        )  # Only OPD appointments (exclude IPD)
     )
     if is_doctor and not is_admin:
         outcomes_q = outcomes_q.filter(Appointment.doctor_user_id == ctx.user.id)
@@ -322,38 +362,51 @@ def get_dashboard_metrics(
         outcomes_q = outcomes_q.filter(Appointment.department_id == nurse_department_id)
 
     outcomes_rows = outcomes_q.group_by(Appointment.status).all()
-    appointments_outcomes = {(s.value if hasattr(s, "value") else str(s)): c for s, c in outcomes_rows}
-    
+    appointments_outcomes = {
+        (s.value if hasattr(s, "value") else str(s)): c for s, c in outcomes_rows
+    }
+
     # Add "Active" appointments count (SCHEDULED + CHECKED_IN + IN_CONSULTATION)
     # Only OPD appointments (exclude IPD) to match appointments page behavior
     active_q = (
         db.query(func.count(Appointment.id))
         .filter(
             Appointment.status.in_(
-                [AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]
+                [
+                    AppointmentStatus.SCHEDULED,
+                    AppointmentStatus.CHECKED_IN,
+                    AppointmentStatus.IN_CONSULTATION,
+                ]
             )
         )
         .filter(Appointment.scheduled_at >= trends_start_date)
-        .filter(Appointment.linked_ipd_admission_id.is_(None))  # Only OPD appointments (exclude IPD)
+        .filter(
+            Appointment.linked_ipd_admission_id.is_(None)
+        )  # Only OPD appointments (exclude IPD)
     )
     if is_doctor and not is_admin:
         active_q = active_q.filter(Appointment.doctor_user_id == ctx.user.id)
     elif nurse_department_id is not None:
         active_q = active_q.filter(Appointment.department_id == nurse_department_id)
-    
+
     active_count = active_q.scalar() or 0
     if active_count > 0:
         appointments_outcomes["ACTIVE"] = active_count
 
     # Patient registrations trend
     patient_reg_q = (
-        db.query(func.date(Patient.created_at).label("date"), func.count(Patient.id).label("count"))
+        db.query(
+            func.date(Patient.created_at).label("date"),
+            func.count(Patient.id).label("count"),
+        )
         .filter(Patient.created_at >= trends_start_date)
         .group_by(func.date(Patient.created_at))
         .order_by(func.date(Patient.created_at))
         .all()
     )
-    patient_registrations_trend = [{"date": str(d), "count": c} for d, c in patient_reg_q]
+    patient_registrations_trend = [
+        {"date": str(d), "count": c} for d, c in patient_reg_q
+    ]
 
     # Pending actions
     doctor_pending_consultations = 0
@@ -364,7 +417,9 @@ def get_dashboard_metrics(
                 Appointment.doctor_user_id == ctx.user.id,
                 Appointment.scheduled_at >= today_start,
                 Appointment.scheduled_at < today_end,
-                Appointment.status.in_([AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]),
+                Appointment.status.in_(
+                    [AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]
+                ),
             )
             .scalar()
             or 0
@@ -394,10 +449,16 @@ def get_dashboard_metrics(
                 .filter(
                     Appointment.scheduled_at >= today_start,
                     Appointment.scheduled_at < today_end,
-                    Appointment.status.in_([AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]),
+                    Appointment.status.in_(
+                        [
+                            AppointmentStatus.CHECKED_IN,
+                            AppointmentStatus.IN_CONSULTATION,
+                        ]
+                    ),
                     ~Appointment.id.in_(
-                        select(Vital.appointment_id)
-                        .where(func.date(Vital.recorded_at) == today_start.date())
+                        select(Vital.appointment_id).where(
+                            func.date(Vital.recorded_at) == today_start.date()
+                        )
                     ),
                 )
                 .count()
@@ -410,7 +471,9 @@ def get_dashboard_metrics(
         db.query(func.count(Appointment.id))
         .filter(
             Appointment.scheduled_at < grace_threshold,
-            Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.NO_SHOW]),
+            Appointment.status.in_(
+                [AppointmentStatus.SCHEDULED, AppointmentStatus.NO_SHOW]
+            ),
         )
         .scalar()
         or 0
@@ -422,11 +485,15 @@ def get_dashboard_metrics(
         .filter(
             Appointment.scheduled_at >= today_start,
             Appointment.scheduled_at < today_end,
-            Appointment.status.in_([AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]),
+            Appointment.status.in_(
+                [AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]
+            ),
             Appointment.checked_in_at.isnot(None),
             Appointment.checked_in_at < incomplete_threshold,
             ~Appointment.id.in_(
-                select(Prescription.appointment_id).where(Prescription.appointment_id.isnot(None))
+                select(Prescription.appointment_id).where(
+                    Prescription.appointment_id.isnot(None)
+                )
             ),
         )
         .scalar()

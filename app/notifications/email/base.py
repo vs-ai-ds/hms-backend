@@ -58,6 +58,10 @@ def send_email(
 
     # Print success message
     if settings.email_sandbox_mode:
-        print(f"[EMAIL SANDBOX SENT{debug_reason}] To: {actual_recipient} (original: {to_email}), Subject: {subject!r}")
+        print(
+            f"[EMAIL SANDBOX SENT{debug_reason}] To: {actual_recipient} (original: {to_email}), Subject: {subject!r}"
+        )
     else:
-        print(f"[EMAIL SENT{debug_reason}] To: {actual_recipient}, Subject: {subject!r}")
+        print(
+            f"[EMAIL SENT{debug_reason}] To: {actual_recipient}, Subject: {subject!r}"
+        )

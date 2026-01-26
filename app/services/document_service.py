@@ -42,7 +42,10 @@ def create_document_for_patient(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Could not ensure tenant tables exist before creating document: {e}", exc_info=True)
+        logger.warning(
+            f"Could not ensure tenant tables exist before creating document: {e}",
+            exc_info=True,
+        )
         # Continue anyway - table might already exist
 
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -91,7 +94,12 @@ def list_documents_for_patient(
     *,
     patient_id: UUID,
 ) -> list[Document]:
-    return db.query(Document).filter(Document.patient_id == patient_id).order_by(Document.created_at.desc()).all()
+    return (
+        db.query(Document)
+        .filter(Document.patient_id == patient_id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
 
 
 def get_document(

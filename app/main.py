@@ -34,7 +34,9 @@ async def startup_event():
         if is_redis_available():
             logger.info("Redis is available. Caching enabled.")
         else:
-            logger.warning("Redis is configured but unavailable. Running in degraded mode (no caching).")
+            logger.warning(
+                "Redis is configured but unavailable. Running in degraded mode (no caching)."
+            )
     else:
         logger.info("Redis not configured. Running without caching.")
 

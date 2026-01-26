@@ -27,7 +27,9 @@ def ensure_search_path(db: Session, tenant_schema_name: str) -> None:
       may hit tenant tables again and crash.
     """
     if not tenant_schema_name or not tenant_schema_name.strip():
-        raise HTTPException(status_code=500, detail="Tenant schema name missing in request context.")
+        raise HTTPException(
+            status_code=500, detail="Tenant schema name missing in request context."
+        )
 
     try:
         db.execute(text(f'SET search_path TO "{tenant_schema_name}", public'))

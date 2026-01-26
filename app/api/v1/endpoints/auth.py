@@ -16,11 +16,19 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.schemas.user import UserResponse
-from app.services.auth_service import AuthenticationError, authenticate_user, issue_access_token_for_user
+from app.services.auth_service import (
+    AuthenticationError,
+    authenticate_user,
+    issue_access_token_for_user,
+)
 from app.services.notification_service import send_notification_email
 from app.services.user_service import get_user_by_email
 from app.utils.email_templates import render_email_template
-from app.utils.token_utils import create_password_reset_token, mark_token_used, verify_token
+from app.utils.token_utils import (
+    create_password_reset_token,
+    mark_token_used,
+    verify_token,
+)
 
 router = APIRouter()
 
@@ -68,7 +76,9 @@ def login(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Login failed for email: {login_data.email[:3]}*** - {str(exc)}")
+        logger.warning(
+            f"Login failed for email: {login_data.email[:3]}*** - {str(exc)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
@@ -224,10 +234,17 @@ def read_current_user(
                     role = user_role.role
                     # Get permissions for this role
                     role_permissions = (
-                        db.query(TenantRolePermission).filter(TenantRolePermission.role_id == role.id).all()
+                        db.query(TenantRolePermission)
+                        .filter(TenantRolePermission.role_id == role.id)
+                        .all()
                     )
-                    permissions = [PermissionResponse(code=rp.permission_code) for rp in role_permissions]
-                    role_responses.append(RoleResponse(name=role.name, permissions=permissions))
+                    permissions = [
+                        PermissionResponse(code=rp.permission_code)
+                        for rp in role_permissions
+                    ]
+                    role_responses.append(
+                        RoleResponse(name=role.name, permissions=permissions)
+                    )
 
                 # Restore original search_path
                 conn.execute(text(f"SET search_path TO {original_path}"))
@@ -304,11 +321,15 @@ def forgot_password(
 
     # Always return success to prevent email enumeration
     if not user:
-        return {"message": "If an account exists with this email, a password reset link has been sent."}
+        return {
+            "message": "If an account exists with this email, a password reset link has been sent."
+        }
 
     if not user.tenant_id:
         # SUPER_ADMIN - handle differently if needed
-        return {"message": "If an account exists with this email, a password reset link has been sent."}
+        return {
+            "message": "If an account exists with this email, a password reset link has been sent."
+        }
 
     # Get tenant to access schema_name
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
@@ -326,7 +347,11 @@ def forgot_password(
         db.commit()
 
         # Build reset URL
-        frontend_url = settings.backend_cors_origins[0] if settings.backend_cors_origins else "http://localhost:5173"
+        frontend_url = (
+            settings.backend_cors_origins[0]
+            if settings.backend_cors_origins
+            else "http://localhost:5173"
+        )
         reset_url = f"{frontend_url}/reset-password?token={reset_token}"
 
         # Send reset email
@@ -360,10 +385,14 @@ def forgot_password(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to send password reset email to {user.email[:3]}***: {e}")
+        logger.warning(
+            f"Failed to send password reset email to {user.email[:3]}***: {e}"
+        )
         db.rollback()
 
-    return {"message": "If an account exists with this email, a password reset link has been sent."}
+    return {
+        "message": "If an account exists with this email, a password reset link has been sent."
+    }
 
 
 @router.get("/validate-reset-token", tags=["auth"])
@@ -452,13 +481,18 @@ def reset_password(
             from app.models.tenant_global import Tenant, TenantStatus
 
             tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-            if tenant and (tenant.status == TenantStatus.PENDING or tenant.status == TenantStatus.VERIFIED):
+            if tenant and (
+                tenant.status == TenantStatus.PENDING
+                or tenant.status == TenantStatus.VERIFIED
+            ):
                 # Activate tenant since user has successfully reset password (email access confirmed)
                 tenant.status = TenantStatus.ACTIVE
 
         db.commit()
 
-        return {"message": "Password has been reset successfully. You can now log in with your new password."}
+        return {
+            "message": "Password has been reset successfully. You can now log in with your new password."
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -489,7 +523,9 @@ def verify_email(
 
     try:
         # First check if token exists
-        verification = db.query(VerificationToken).filter(VerificationToken.token == token).first()
+        verification = (
+            db.query(VerificationToken).filter(VerificationToken.token == token).first()
+        )
 
         if not verification:
             raise HTTPException(

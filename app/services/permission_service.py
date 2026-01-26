@@ -27,7 +27,9 @@ def get_user_permissions(db: Session, user: User, tenant_id: UUID) -> set[str]:
         Set of permission code strings (e.g., {"dashboard:view", "patients:create", ...})
     """
     # Query tenant-scoped user roles
-    user_roles = db.query(TenantUserRole).filter(TenantUserRole.user_id == user.id).all()
+    user_roles = (
+        db.query(TenantUserRole).filter(TenantUserRole.user_id == user.id).all()
+    )
 
     if not user_roles:
         return set()
@@ -48,7 +50,9 @@ def get_user_permissions(db: Session, user: User, tenant_id: UUID) -> set[str]:
     return permissions
 
 
-def get_user_roles_with_permissions(db: Session, user: User, tenant_id: UUID) -> list[dict]:
+def get_user_roles_with_permissions(
+    db: Session, user: User, tenant_id: UUID
+) -> list[dict]:
     """
     Get user's roles with their permissions in a tenant.
     Returns a list of dicts with 'name' and 'permissions' keys.
@@ -75,7 +79,9 @@ def get_user_roles_with_permissions(db: Session, user: User, tenant_id: UUID) ->
         role = ur.role
         # Get permissions for this role
         role_perms = (
-            db.query(TenantRolePermission.permission_code).filter(TenantRolePermission.role_id == role.id).all()
+            db.query(TenantRolePermission.permission_code)
+            .filter(TenantRolePermission.role_id == role.id)
+            .all()
         )
 
         permissions = [{"code": rp[0]} for rp in role_perms]

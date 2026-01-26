@@ -123,7 +123,9 @@ class Prescription(Base):
 
     patient: Mapped["Patient"] = relationship("Patient")
     doctor: Mapped["User"] = relationship("User", foreign_keys=[doctor_user_id])
-    appointment: Mapped["Appointment"] = relationship("Appointment", backref="prescriptions")
+    appointment: Mapped["Appointment"] = relationship(
+        "Appointment", backref="prescriptions"
+    )
 
 
 class PrescriptionItem(Base):
@@ -152,10 +154,18 @@ class PrescriptionItem(Base):
 
     # Medicine Information
     medicine_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    dosage: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "500mg"
-    frequency: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "every 8 hours"
-    duration: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "5 days"
-    instructions: Mapped[str | None] = mapped_column(String(500), nullable=True)  # e.g. "after food"
+    dosage: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # e.g. "500mg"
+    frequency: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # e.g. "every 8 hours"
+    duration: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # e.g. "5 days"
+    instructions: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )  # e.g. "after food"
     quantity: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,

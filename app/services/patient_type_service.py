@@ -18,13 +18,18 @@ def get_patient_type(db: Session, patient_id: UUID) -> PatientType:
     """
     active_admission = (
         db.query(Admission)
-        .filter(Admission.patient_id == patient_id, Admission.status == AdmissionStatus.ACTIVE)
+        .filter(
+            Admission.patient_id == patient_id,
+            Admission.status == AdmissionStatus.ACTIVE,
+        )
         .first()
     )
     return PatientType.IPD if active_admission else PatientType.OPD
 
 
-def enrich_patient_response_with_type(db: Session, patient_dict: dict, patient_id: UUID) -> dict:
+def enrich_patient_response_with_type(
+    db: Session, patient_dict: dict, patient_id: UUID
+) -> dict:
     """
     Add computed patient_type to patient response dict.
     """

@@ -32,9 +32,15 @@ class TenantMetrics(Base):
     # Aggregated counts (across ALL tenants, regardless of status)
     total_tenants = Column(Integer, nullable=False, default=0, server_default=text("0"))
     total_users = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    total_patients = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    total_appointments = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    total_prescriptions = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    total_patients = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    total_appointments = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    total_prescriptions = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
 
     # Timestamps
     updated_at = Column(

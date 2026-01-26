@@ -4,7 +4,6 @@ from sqlalchemy import create_engine, pool
 
 from alembic import context
 from app.core.config import get_settings
-import app.models.public
 
 # Import all *public schema* models so Alembic can detect them.
 # Tenant-domain (per-tenant) tables are created via TENANT_TABLES in tenant_domain.py
@@ -12,7 +11,6 @@ import app.models.public
 from app.models.base import Base
 
 # Import VerificationToken model so Alembic can detect it (public schema)
-from app.utils.token_utils import VerificationToken
 
 # This is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -21,7 +21,9 @@ class UserBase(BaseModel):
     first_name: str
     last_name: str
     phone: str | None = None
-    department: str | None = None  # Optional in response (for backward compatibility with existing users)
+    department: str | None = (
+        None  # Optional in response (for backward compatibility with existing users)
+    )
     specialization: str | None = None
 
 
@@ -37,10 +39,14 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
     phone: str | None = None
-    password: str | None = None  # Temporary password (will be generated if not provided)
+    password: str | None = (
+        None  # Temporary password (will be generated if not provided)
+    )
     department: str  # Made mandatory
     specialization: str | None = None
-    roles: list[str] = []  # Changed to list[str] to support both system and custom roles
+    roles: list[
+        str
+    ] = []  # Changed to list[str] to support both system and custom roles
 
     @field_validator("first_name")
     @classmethod
@@ -50,7 +56,9 @@ class UserCreate(BaseModel):
             raise ValueError("First name must be 1-50 characters")
         # Allow Unicode letters, spaces, . ' - (using character class)
         if not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("First name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "First name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v
 
     @field_validator("last_name")
@@ -61,7 +69,9 @@ class UserCreate(BaseModel):
             raise ValueError("Last name must be 1-50 characters")
         # Allow Unicode letters, spaces, . ' - (using character class)
         if not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("Last name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "Last name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v
 
     @field_validator("phone")
@@ -75,7 +85,9 @@ class UserCreate(BaseModel):
         # Validate phone format and digits
         phone_regex = re.compile(r"^[0-9+\-\s]{5,15}$")
         if not phone_regex.match(v):
-            raise ValueError("Phone must be 5-15 characters and contain only digits, spaces, + or -")
+            raise ValueError(
+                "Phone must be 5-15 characters and contain only digits, spaces, + or -"
+            )
         if not validate_phone_digits(v):
             raise ValueError("Phone must be 8-15 digits (remove spaces or symbols)")
         return v
@@ -122,7 +134,9 @@ class UserResponse(UserBase):
     is_active: bool = True
     is_deleted: bool = False
     must_change_password: bool = False
-    email_verified: bool = False  # True when user has successfully logged in (email access confirmed)
+    email_verified: bool = (
+        False  # True when user has successfully logged in (email access confirmed)
+    )
     roles: list[RoleResponse]  # Changed from list[RoleName] to list[RoleResponse]
     tenant_name: str | None = None  # Hospital name for frontend display
     created_at: datetime

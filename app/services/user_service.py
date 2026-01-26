@@ -76,7 +76,7 @@ def create_user(db: Session, user_in: UserCreate, tenant: Tenant | None = None) 
                 tenant_roles = (
                     db.query(TenantRole)
                     .filter(TenantRole.name.in_(role_names))
-                    .filter(TenantRole.is_active == True)  # Only assign active roles
+                    .filter(TenantRole.is_active.is_(True))  # Only assign active roles
                     .all()
                 )
 
@@ -84,7 +84,9 @@ def create_user(db: Session, user_in: UserCreate, tenant: Tenant | None = None) 
                 found_role_names = {role.name for role in tenant_roles}
                 missing_roles = set(role_names) - found_role_names
                 if missing_roles:
-                    raise ValueError(f"Roles not found or inactive: {', '.join(missing_roles)}")
+                    raise ValueError(
+                        f"Roles not found or inactive: {', '.join(missing_roles)}"
+                    )
 
                 # Create TenantUserRole entries
                 for role in tenant_roles:
@@ -98,7 +100,7 @@ def create_user(db: Session, user_in: UserCreate, tenant: Tenant | None = None) 
 
                 # Restore original search_path
                 conn.execute(text(f"SET search_path TO {original_path}"))
-            except Exception as e:
+            except Exception:
                 # Rollback transaction first, then restore search_path
                 db.rollback()
                 try:
@@ -131,9 +133,13 @@ def create_hospital_admin_for_tenant(
         conn.execute(text(f'SET search_path TO "{tenant.schema_name}", public'))
 
         # Find the Administrator department (should be created by seed_tenant_defaults)
-        admin_dept = db.query(Department).filter(Department.name == "Administrator").first()
+        admin_dept = (
+            db.query(Department).filter(Department.name == "Administrator").first()
+        )
         if not admin_dept:
-            raise ValueError("Administrator department not found. Tenant seeding may have failed.")
+            raise ValueError(
+                "Administrator department not found. Tenant seeding may have failed."
+            )
 
         user_in = UserCreate(
             tenant_id=tenant.id,
@@ -150,7 +156,7 @@ def create_hospital_admin_for_tenant(
         # Restore search_path
         conn.execute(text(f"SET search_path TO {original_path}"))
         return user
-    except Exception as e:
+    except Exception:
         conn.execute(text(f"SET search_path TO {original_path}"))
         raise
 

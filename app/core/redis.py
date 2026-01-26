@@ -53,7 +53,9 @@ def get_redis_client() -> Optional[redis.Redis]:
         logger.info("Redis connection established successfully.")
         return _redis_client
     except Exception as e:
-        logger.warning(f"Failed to connect to Redis: {e}. Running in degraded mode (no caching).")
+        logger.warning(
+            f"Failed to connect to Redis: {e}. Running in degraded mode (no caching)."
+        )
         _redis_available = False
         return None
 

@@ -91,7 +91,9 @@ def create_admission(
     department_id = payload.department_id
 
     # Check if current user is a doctor
-    current_user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    current_user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_current_user_doctor = (
         "DOCTOR" in current_user_roles
         and "HOSPITAL_ADMIN" not in current_user_roles
@@ -106,7 +108,11 @@ def create_admission(
         if not department_id:
             # Get department_id from user's department name
             if ctx.user.department:
-                user_dept = db.query(Department).filter(Department.name == ctx.user.department).first()
+                user_dept = (
+                    db.query(Department)
+                    .filter(Department.name == ctx.user.department)
+                    .first()
+                )
                 if user_dept:
                     department_id = user_dept.id
                 else:
@@ -140,7 +146,9 @@ def create_admission(
     if not doctor_user:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    doctor_roles = get_user_role_names(db, doctor_user, tenant_schema_name=ctx.tenant.schema_name)
+    doctor_roles = get_user_role_names(
+        db, doctor_user, tenant_schema_name=ctx.tenant.schema_name
+    )
     if "DOCTOR" not in doctor_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -171,9 +179,16 @@ def create_admission(
         .filter(
             Appointment.patient_id == payload.patient_id,
             Appointment.status.in_(
-                [AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]
+                [
+                    AppointmentStatus.SCHEDULED,
+                    AppointmentStatus.CHECKED_IN,
+                    AppointmentStatus.IN_CONSULTATION,
+                ]
             ),
-            Appointment.scheduled_at >= (now - timedelta(hours=2)),  # Include appointments from last 2 hours (same-day)
+            Appointment.scheduled_at
+            >= (
+                now - timedelta(hours=2)
+            ),  # Include appointments from last 2 hours (same-day)
         )
         .all()
     )
@@ -240,14 +255,20 @@ def create_admission(
         raise HTTPException(status_code=500, detail="Failed to create admission.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    admission = _reload_admission_with_relations(db, admission.id, ctx.tenant.schema_name)
+    admission = _reload_admission_with_relations(
+        db, admission.id, ctx.tenant.schema_name
+    )
 
     patient = admission.patient
 
     # Get department name for notification
     department_name = "N/A"
     if admission.department_id:
-        dept = db.query(Department).filter(Department.id == admission.department_id).first()
+        dept = (
+            db.query(Department)
+            .filter(Department.id == admission.department_id)
+            .first()
+        )
         department_name = dept.name if dept else "N/A"
 
     # 3) Notifications (best-effort)
@@ -292,8 +313,10 @@ def create_admission(
                 html=True,
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: admission email notification failed. adm=%s", admission.id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: admission email notification failed. adm=%s", admission.id
+            )
 
     if patient and patient.consent_sms and patient.phone_primary:
         try:
@@ -313,13 +336,17 @@ def create_admission(
                 reason="ipd_admission",
                 check_patient_flag=True,
             )
-        except Exception as e:
-            logger.exception("Non-fatal: admission SMS notification failed. adm=%s", admission.id)
+        except Exception:
+            logger.exception(
+                "Non-fatal: admission SMS notification failed. adm=%s", admission.id
+            )
 
     # 4) Build and return response
     admission_dict = AdmissionResponse.model_validate(admission).model_dump()
     if admission.patient:
-        admission_dict["patient_name"] = f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        admission_dict["patient_name"] = (
+            f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        )
         admission_dict["patient_code"] = admission.patient.patient_code
     if admission.primary_doctor:
         admission_dict["doctor_name"] = (
@@ -336,9 +363,12 @@ def create_admission(
 def list_admissions(
     patient_id: Optional[UUID] = Query(None, description="Filter by patient ID"),
     status: Optional[str] = Query(
-        None, description="Filter by status (ACTIVE, DISCHARGED, CANCELLED) - alias for status_filter"
+        None,
+        description="Filter by status (ACTIVE, DISCHARGED, CANCELLED) - alias for status_filter",
     ),
-    status_filter: Optional[str] = Query(None, description="Filter by status (ACTIVE, DISCHARGED, CANCELLED)"),
+    status_filter: Optional[str] = Query(
+        None, description="Filter by status (ACTIVE, DISCHARGED, CANCELLED)"
+    ),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[AdmissionResponse]:
@@ -353,7 +383,9 @@ def list_admissions(
     )
 
     # Apply ABAC filters
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
 
@@ -372,7 +404,9 @@ def list_admissions(
             status_enum = AdmissionStatus(status_to_filter)
             query = query.filter(Admission.status == status_enum)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status_to_filter}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid status: {status_to_filter}"
+            )
 
     # Order by admit_datetime descending
     query = query.order_by(Admission.admit_datetime.desc())
@@ -391,7 +425,11 @@ def list_admissions(
         if admission.department_id:
             from app.models.department import Department
 
-            dept = db.query(Department).filter(Department.id == admission.department_id).first()
+            dept = (
+                db.query(Department)
+                .filter(Department.id == admission.department_id)
+                .first()
+            )
             admission_dict["department"] = dept.name if dept else None
         if admission.primary_doctor:
             admission_dict["doctor_name"] = (
@@ -428,7 +466,9 @@ def get_admission(
         raise HTTPException(status_code=404, detail="Admission not found")
 
     # ABAC: Doctors can only view their own admissions
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
 
@@ -441,7 +481,9 @@ def get_admission(
     # Build response
     admission_dict = AdmissionResponse.model_validate(admission).model_dump()
     if admission.patient:
-        admission_dict["patient_name"] = f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        admission_dict["patient_name"] = (
+            f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        )
         admission_dict["patient_code"] = admission.patient.patient_code
     if admission.primary_doctor:
         admission_dict["doctor_name"] = (
@@ -450,7 +492,11 @@ def get_admission(
     if admission.department_id:
         from app.models.department import Department
 
-        dept = db.query(Department).filter(Department.id == admission.department_id).first()
+        dept = (
+            db.query(Department)
+            .filter(Department.id == admission.department_id)
+            .first()
+        )
         admission_dict["department"] = dept.name if dept else None
 
     return AdmissionResponse(**admission_dict)
@@ -524,7 +570,9 @@ def discharge_admission(
     # Build response
     admission_dict = AdmissionResponse.model_validate(admission).model_dump()
     if admission.patient:
-        admission_dict["patient_name"] = f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        admission_dict["patient_name"] = (
+            f"{admission.patient.first_name} {admission.patient.last_name or ''}".strip()
+        )
         admission_dict["patient_code"] = admission.patient.patient_code
     if admission.primary_doctor:
         admission_dict["doctor_name"] = (
@@ -533,7 +581,11 @@ def discharge_admission(
     if admission.department_id:
         from app.models.department import Department
 
-        dept = db.query(Department).filter(Department.id == admission.department_id).first()
+        dept = (
+            db.query(Department)
+            .filter(Department.id == admission.department_id)
+            .first()
+        )
         admission_dict["department"] = dept.name if dept else None
 
     return AdmissionResponse(**admission_dict)

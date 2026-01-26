@@ -39,7 +39,9 @@ def validate_password_strength(password: str) -> None:
         raise ValueError("Password must contain at least one digit")
 
     if not re.search(r"[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]", password):
-        raise ValueError("Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)")
+        raise ValueError(
+            "Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)"
+        )
 
 
 def check_password_history(
@@ -85,7 +87,11 @@ def check_password_history(
         )
 
         for old_hash_tuple in recent_passwords:
-            old_hash = old_hash_tuple[0] if isinstance(old_hash_tuple, tuple) else old_hash_tuple
+            old_hash = (
+                old_hash_tuple[0]
+                if isinstance(old_hash_tuple, tuple)
+                else old_hash_tuple
+            )
             if old_hash == new_password_hash:
                 return False  # Password is in history, cannot reuse
     except Exception as e:
@@ -137,7 +143,9 @@ def add_password_to_history(
     if len(all_entries) > keep_last_n:
         # Delete entries beyond keep_last_n
         ids_to_delete = [entry[0] for entry in all_entries[keep_last_n:]]
-        db.query(PasswordHistory).filter(PasswordHistory.id.in_(ids_to_delete)).delete(synchronize_session=False)
+        db.query(PasswordHistory).filter(PasswordHistory.id.in_(ids_to_delete)).delete(
+            synchronize_session=False
+        )
 
 
 def change_user_password(
@@ -195,7 +203,9 @@ def change_user_password(
     # Add current password to history before changing
     # This ensures we track it even if it's a temp password
     try:
-        add_password_to_history(db, user_id=user_id, password_hash=user.hashed_password, keep_last_n=3)
+        add_password_to_history(
+            db, user_id=user_id, password_hash=user.hashed_password, keep_last_n=3
+        )
     except Exception as e:
         # If password_history table doesn't exist, log warning but continue
         import logging
@@ -213,7 +223,9 @@ def change_user_password(
 
     # Add new password to history
     try:
-        add_password_to_history(db, user_id=user_id, password_hash=new_password_hash, keep_last_n=3)
+        add_password_to_history(
+            db, user_id=user_id, password_hash=new_password_hash, keep_last_n=3
+        )
     except Exception as e:
         # If password_history table doesn't exist, log warning but continue
         import logging
@@ -228,8 +240,13 @@ def change_user_password(
         audit_log = AuditLog(
             user_id=user_id,
             performed_by_id=performed_by_user_id or user_id,
-            event_type=AuditEventType.PASSWORD_CHANGE if performed_by_user_id else AuditEventType.PASSWORD_CHANGE,
-            metadata={"self_change": performed_by_user_id is None or performed_by_user_id == user_id},
+            event_type=AuditEventType.PASSWORD_CHANGE
+            if performed_by_user_id
+            else AuditEventType.PASSWORD_CHANGE,
+            metadata={
+                "self_change": performed_by_user_id is None
+                or performed_by_user_id == user_id
+            },
         )
         db.add(audit_log)
     except ImportError:

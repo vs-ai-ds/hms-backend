@@ -53,7 +53,9 @@ class QuickRegisterRequest(BaseModel):
             raise ValueError("First name must be 1-50 characters")
         # Allow Unicode letters, spaces, . ' - (using character class)
         if not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("First name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "First name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v
 
     @field_validator("last_name")
@@ -65,7 +67,9 @@ class QuickRegisterRequest(BaseModel):
         if v and (len(v) < 1 or len(v) > 50):
             raise ValueError("Last name must be 1-50 characters if provided")
         if v and not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("Last name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "Last name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v if v else None
 
     @field_validator("dob")
@@ -172,7 +176,9 @@ class ProfileCompleteRequest(BaseModel):
         if v and (len(v) < 1 or len(v) > 50):
             raise ValueError("Name must be 1-50 characters if provided")
         if v and not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("Name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "Name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v if v else None
 
     @field_validator("email")
@@ -222,7 +228,9 @@ class ProfileCompleteRequest(BaseModel):
             raise ValueError("National ID number must be 3-32 characters if provided")
         # Allow letters, digits, hyphens, slashes
         if v and not re.match(r"^[A-Za-z0-9\-/]+$", v):
-            raise ValueError("National ID number can only contain letters, digits, hyphens, and slashes")
+            raise ValueError(
+                "National ID number can only contain letters, digits, hyphens, and slashes"
+            )
         return v if v else None
 
     @field_validator("known_allergies", "chronic_conditions", "clinical_notes")
@@ -252,22 +260,36 @@ class ProfileCompleteRequest(BaseModel):
         today = date.today()
         thirty_days_ago = today - timedelta(days=30)
         if v < thirty_days_ago or v > today:
-            raise ValueError("Date of death must be within the last 30 days including today")
+            raise ValueError(
+                "Date of death must be within the last 30 days including today"
+            )
         return v
 
     @model_validator(mode="after")
     def validate_emergency_contact(self):
         """If any emergency field is filled, require all three (name, relation, phone)."""
-        has_name = bool(self.emergency_contact_name and self.emergency_contact_name.strip())
-        has_relation = bool(self.emergency_contact_relation and self.emergency_contact_relation.strip())
-        has_phone = bool(self.emergency_contact_phone and self.emergency_contact_phone.strip())
+        has_name = bool(
+            self.emergency_contact_name and self.emergency_contact_name.strip()
+        )
+        has_relation = bool(
+            self.emergency_contact_relation and self.emergency_contact_relation.strip()
+        )
+        has_phone = bool(
+            self.emergency_contact_phone and self.emergency_contact_phone.strip()
+        )
         if has_name or has_relation or has_phone:
             if not has_name:
-                raise ValueError("Emergency contact name is required if any emergency contact field is provided")
+                raise ValueError(
+                    "Emergency contact name is required if any emergency contact field is provided"
+                )
             if not has_relation:
-                raise ValueError("Emergency contact relation is required if any emergency contact field is provided")
+                raise ValueError(
+                    "Emergency contact relation is required if any emergency contact field is provided"
+                )
             if not has_phone:
-                raise ValueError("Emergency contact phone is required if any emergency contact field is provided")
+                raise ValueError(
+                    "Emergency contact phone is required if any emergency contact field is provided"
+                )
         return self
 
     @model_validator(mode="after")
@@ -277,9 +299,13 @@ class ProfileCompleteRequest(BaseModel):
         has_number = bool(self.national_id_number and self.national_id_number.strip())
         if has_type or has_number:
             if not has_type:
-                raise ValueError("National ID type is required if National ID number is provided")
+                raise ValueError(
+                    "National ID type is required if National ID number is provided"
+                )
             if not has_number:
-                raise ValueError("National ID number is required if National ID type is provided")
+                raise ValueError(
+                    "National ID number is required if National ID type is provided"
+                )
         return self
 
 
@@ -378,7 +404,9 @@ class PatientUpdate(BaseModel):
         if not v or len(v) < 1 or len(v) > 50:
             raise ValueError("First name must be 1-50 characters")
         if not re.match(r"^[a-zA-Z\u00C0-\u017F\s.'-]+$", v):
-            raise ValueError("First name can only contain letters, spaces, periods, apostrophes, and hyphens")
+            raise ValueError(
+                "First name can only contain letters, spaces, periods, apostrophes, and hyphens"
+            )
         return v
 
     @field_validator("phone_primary")

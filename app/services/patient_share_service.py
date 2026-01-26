@@ -10,8 +10,13 @@ from app.models.admission import Admission
 from app.models.appointment import Appointment
 from app.models.department import Department
 from app.models.patient import Patient
-from app.models.patient_share import PatientShare, PatientShareAccessLog, PatientShareLink, ShareMode, ShareStatus
-from app.models.prescription import Prescription, PrescriptionItem
+from app.models.patient_share import (
+    PatientShare,
+    PatientShareAccessLog,
+    ShareMode,
+    ShareStatus,
+)
+from app.models.prescription import Prescription
 from app.models.tenant_global import Tenant
 from app.models.user import User
 from app.models.vital import Vital
@@ -38,7 +43,11 @@ def create_patient_share(
     Create a patient share record.
     For CREATE_RECORD mode, patient record will be created when receiver imports it.
     """
-    expires_at = datetime.now(timezone.utc) + timedelta(days=validity_days) if validity_days > 0 else None
+    expires_at = (
+        datetime.now(timezone.utc) + timedelta(days=validity_days)
+        if validity_days > 0
+        else None
+    )
     token = generate_share_token()
 
     share = PatientShare(
@@ -112,21 +121,21 @@ def get_shared_patient_summary(
             .order_by(Appointment.scheduled_at.desc())
             .all()
         )
-        
+
         all_prescriptions = (
             db.query(Prescription)
             .filter(Prescription.patient_id == patient.id)
             .order_by(Prescription.created_at.desc())
             .all()
         )
-        
+
         all_admissions = (
             db.query(Admission)
             .filter(Admission.patient_id == patient.id)
             .order_by(Admission.admit_datetime.desc())
             .all()
         )
-        
+
         all_vitals = (
             db.query(Vital)
             .filter(Vital.patient_id == patient.id)
@@ -140,28 +149,47 @@ def get_shared_patient_summary(
             dept_name = None
             doctor_name = None
             try:
-                dept = db.query(Department).filter(Department.id == apt.department_id).first()
+                dept = (
+                    db.query(Department)
+                    .filter(Department.id == apt.department_id)
+                    .first()
+                )
                 if dept:
                     dept_name = dept.name
                 doctor = db.query(User).filter(User.id == apt.doctor_user_id).first()
                 if doctor:
-                    doctor_name = f"{doctor.first_name} {doctor.last_name or ''}".strip() or doctor.email
+                    doctor_name = (
+                        f"{doctor.first_name} {doctor.last_name or ''}".strip()
+                        or doctor.email
+                    )
             except Exception:
                 pass
-            
-            appointments_data.append({
-                "id": str(apt.id),
-                "scheduled_at": apt.scheduled_at.isoformat() if apt.scheduled_at else None,
-                "status": apt.status.value if hasattr(apt.status, 'value') else str(apt.status),
-                "notes": apt.notes,
-                "checked_in_at": apt.checked_in_at.isoformat() if apt.checked_in_at else None,
-                "consultation_started_at": apt.consultation_started_at.isoformat() if apt.consultation_started_at else None,
-                "completed_at": apt.completed_at.isoformat() if apt.completed_at else None,
-                "department_id": str(apt.department_id),
-                "department_name": dept_name,
-                "doctor_user_id": str(apt.doctor_user_id),
-                "doctor_name": doctor_name,
-            })
+
+            appointments_data.append(
+                {
+                    "id": str(apt.id),
+                    "scheduled_at": apt.scheduled_at.isoformat()
+                    if apt.scheduled_at
+                    else None,
+                    "status": apt.status.value
+                    if hasattr(apt.status, "value")
+                    else str(apt.status),
+                    "notes": apt.notes,
+                    "checked_in_at": apt.checked_in_at.isoformat()
+                    if apt.checked_in_at
+                    else None,
+                    "consultation_started_at": apt.consultation_started_at.isoformat()
+                    if apt.consultation_started_at
+                    else None,
+                    "completed_at": apt.completed_at.isoformat()
+                    if apt.completed_at
+                    else None,
+                    "department_id": str(apt.department_id),
+                    "department_name": dept_name,
+                    "doctor_user_id": str(apt.doctor_user_id),
+                    "doctor_name": doctor_name,
+                }
+            )
 
         # Build prescriptions data with items
         prescriptions_data = []
@@ -170,37 +198,56 @@ def get_shared_patient_summary(
             try:
                 doctor = db.query(User).filter(User.id == prx.doctor_user_id).first()
                 if doctor:
-                    doctor_name = f"{doctor.first_name} {doctor.last_name or ''}".strip() or doctor.email
+                    doctor_name = (
+                        f"{doctor.first_name} {doctor.last_name or ''}".strip()
+                        or doctor.email
+                    )
             except Exception:
                 pass
-            
+
             items_data = []
-            for item in prx.items if hasattr(prx, 'items') else []:
-                items_data.append({
-                    "medicine_name": item.medicine_name,
-                    "dosage": item.dosage,
-                    "frequency": item.frequency,
-                    "duration": item.duration,
-                    "instructions": item.instructions,
-                    "quantity": item.quantity,
-                    "stock_item_id": str(item.stock_item_id) if item.stock_item_id else None,
-                })
-            
-            prescriptions_data.append({
-                "id": str(prx.id),
-                "prescription_code": prx.prescription_code,
-                "status": prx.status.value if hasattr(prx.status, 'value') else str(prx.status),
-                "chief_complaint": prx.chief_complaint,
-                "diagnosis": prx.diagnosis,
-                "cancelled_reason": prx.cancelled_reason if hasattr(prx, 'cancelled_reason') else None,
-                "cancelled_at": prx.cancelled_at.isoformat() if hasattr(prx, 'cancelled_at') and prx.cancelled_at else None,
-                "created_at": prx.created_at.isoformat() if prx.created_at else None,
-                "doctor_user_id": str(prx.doctor_user_id),
-                "doctor_name": doctor_name,
-                "appointment_id": str(prx.appointment_id) if prx.appointment_id else None,
-                "admission_id": str(prx.admission_id) if prx.admission_id else None,
-                "items": items_data,
-            })
+            for item in prx.items if hasattr(prx, "items") else []:
+                items_data.append(
+                    {
+                        "medicine_name": item.medicine_name,
+                        "dosage": item.dosage,
+                        "frequency": item.frequency,
+                        "duration": item.duration,
+                        "instructions": item.instructions,
+                        "quantity": item.quantity,
+                        "stock_item_id": str(item.stock_item_id)
+                        if item.stock_item_id
+                        else None,
+                    }
+                )
+
+            prescriptions_data.append(
+                {
+                    "id": str(prx.id),
+                    "prescription_code": prx.prescription_code,
+                    "status": prx.status.value
+                    if hasattr(prx.status, "value")
+                    else str(prx.status),
+                    "chief_complaint": prx.chief_complaint,
+                    "diagnosis": prx.diagnosis,
+                    "cancelled_reason": prx.cancelled_reason
+                    if hasattr(prx, "cancelled_reason")
+                    else None,
+                    "cancelled_at": prx.cancelled_at.isoformat()
+                    if hasattr(prx, "cancelled_at") and prx.cancelled_at
+                    else None,
+                    "created_at": prx.created_at.isoformat()
+                    if prx.created_at
+                    else None,
+                    "doctor_user_id": str(prx.doctor_user_id),
+                    "doctor_name": doctor_name,
+                    "appointment_id": str(prx.appointment_id)
+                    if prx.appointment_id
+                    else None,
+                    "admission_id": str(prx.admission_id) if prx.admission_id else None,
+                    "items": items_data,
+                }
+            )
 
         # Build admissions data
         admissions_data = []
@@ -208,27 +255,44 @@ def get_shared_patient_summary(
             dept_name = None
             doctor_name = None
             try:
-                dept = db.query(Department).filter(Department.id == adm.department_id).first()
+                dept = (
+                    db.query(Department)
+                    .filter(Department.id == adm.department_id)
+                    .first()
+                )
                 if dept:
                     dept_name = dept.name
-                doctor = db.query(User).filter(User.id == adm.primary_doctor_user_id).first()
+                doctor = (
+                    db.query(User).filter(User.id == adm.primary_doctor_user_id).first()
+                )
                 if doctor:
-                    doctor_name = f"{doctor.first_name} {doctor.last_name or ''}".strip() or doctor.email
+                    doctor_name = (
+                        f"{doctor.first_name} {doctor.last_name or ''}".strip()
+                        or doctor.email
+                    )
             except Exception:
                 pass
-            
-            admissions_data.append({
-                "id": str(adm.id),
-                "admit_datetime": adm.admit_datetime.isoformat() if adm.admit_datetime else None,
-                "discharge_datetime": adm.discharge_datetime.isoformat() if adm.discharge_datetime else None,
-                "discharge_summary": adm.discharge_summary,
-                "notes": adm.notes,
-                "status": adm.status.value if hasattr(adm.status, 'value') else str(adm.status),
-                "department_id": str(adm.department_id),
-                "department_name": dept_name,
-                "primary_doctor_user_id": str(adm.primary_doctor_user_id),
-                "doctor_name": doctor_name,
-            })
+
+            admissions_data.append(
+                {
+                    "id": str(adm.id),
+                    "admit_datetime": adm.admit_datetime.isoformat()
+                    if adm.admit_datetime
+                    else None,
+                    "discharge_datetime": adm.discharge_datetime.isoformat()
+                    if adm.discharge_datetime
+                    else None,
+                    "discharge_summary": adm.discharge_summary,
+                    "notes": adm.notes,
+                    "status": adm.status.value
+                    if hasattr(adm.status, "value")
+                    else str(adm.status),
+                    "department_id": str(adm.department_id),
+                    "department_name": dept_name,
+                    "primary_doctor_user_id": str(adm.primary_doctor_user_id),
+                    "doctor_name": doctor_name,
+                }
+            )
 
         # Build vitals data
         vitals_data = [
@@ -257,16 +321,16 @@ def get_shared_patient_summary(
             }
             for apt in all_appointments[:5]
         ]
-        
+
         last_prescriptions = [
             {
                 "date": str(prx.created_at.date()),
                 "diagnosis": prx.diagnosis,
-                "medicines_count": len(prx.items) if hasattr(prx, 'items') else 0,
+                "medicines_count": len(prx.items) if hasattr(prx, "items") else 0,
             }
             for prx in all_prescriptions[:5]
         ]
-        
+
         recent_vitals = [
             {
                 "date": str(v.recorded_at.date()),
@@ -313,7 +377,9 @@ def get_shared_patient_summary(
             preferred_language=patient.preferred_language,
             is_dnr=getattr(patient, "is_dnr", False),
             is_deceased=getattr(patient, "is_deceased", False),
-            date_of_death=str(patient.date_of_death) if getattr(patient, "date_of_death", None) else None,
+            date_of_death=str(patient.date_of_death)
+            if getattr(patient, "date_of_death", None)
+            else None,
             vitals=vitals_data,
             appointments=appointments_data,
             prescriptions=prescriptions_data,

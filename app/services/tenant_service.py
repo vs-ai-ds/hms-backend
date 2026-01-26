@@ -30,7 +30,17 @@ logger = logging.getLogger(__name__)
 #   should reference it as public.<enum_name>
 TENANT_ENUMS: List[Tuple[str, List[str]]] = [
     ("stock_item_type_enum", ["MEDICINE", "EQUIPMENT", "CONSUMABLE"]),
-    ("appointment_status_enum", ["SCHEDULED", "CHECKED_IN", "IN_CONSULTATION", "COMPLETED", "CANCELLED", "NO_SHOW"]),
+    (
+        "appointment_status_enum",
+        [
+            "SCHEDULED",
+            "CHECKED_IN",
+            "IN_CONSULTATION",
+            "COMPLETED",
+            "CANCELLED",
+            "NO_SHOW",
+        ],
+    ),
     ("admission_status_enum", ["ACTIVE", "DISCHARGED", "CANCELLED"]),
     ("prescription_status_enum", ["DRAFT", "ISSUED", "DISPENSED", "CANCELLED"]),
     ("notification_channel_enum", ["EMAIL", "SMS", "WHATSAPP"]),
@@ -107,7 +117,9 @@ def _debug_db_context(conn, schema_name: str) -> Dict[str, Any]:
     """
     out: Dict[str, Any] = {}
     try:
-        out["current_database"] = conn.execute(text("SELECT current_database()")).scalar()
+        out["current_database"] = conn.execute(
+            text("SELECT current_database()")
+        ).scalar()
         out["current_user"] = conn.execute(text("SELECT current_user")).scalar()
         out["search_path"] = conn.execute(text("SHOW search_path")).scalar()
         out["schema_exists"] = _schema_exists(conn, schema_name)
@@ -125,7 +137,9 @@ def _reset_search_path(conn) -> None:
     conn.execute(text("SET search_path TO public"))
 
 
-def _create_enum_in_schema(conn, schema_name: str, enum_name: str, enum_values: List[str]) -> None:
+def _create_enum_in_schema(
+    conn, schema_name: str, enum_name: str, enum_values: List[str]
+) -> None:
     """
     Create enum in tenant schema if missing.
     Uses schema-qualified CREATE TYPE so it does NOT rely on search_path.
@@ -137,7 +151,9 @@ def _create_enum_in_schema(conn, schema_name: str, enum_name: str, enum_values: 
     values_sql = ", ".join([f"'{v}'" for v in enum_values])
 
     # schema-qualified create
-    conn.execute(text(f'CREATE TYPE "{schema_name}".{enum_name} AS ENUM ({values_sql})'))
+    conn.execute(
+        text(f'CREATE TYPE "{schema_name}".{enum_name} AS ENUM ({values_sql})')
+    )
 
 
 def _drop_schema_objects_for_reset(conn, schema_name: str) -> None:
@@ -149,7 +165,9 @@ def _drop_schema_objects_for_reset(conn, schema_name: str) -> None:
 
     # Drop tables
     for table_name in inspector.get_table_names(schema=schema_name):
-        conn.execute(text(f'DROP TABLE IF EXISTS "{schema_name}"."{table_name}" CASCADE'))
+        conn.execute(
+            text(f'DROP TABLE IF EXISTS "{schema_name}"."{table_name}" CASCADE')
+        )
 
     # Drop known enums (tenant scoped)
     for enum_name, _ in TENANT_ENUMS:
@@ -189,7 +207,9 @@ def ensure_tenant_tables_exist(db: Session, schema_name: str) -> None:
         for table in TENANT_TABLES:
             if table.name in existing_tables:
                 continue
-            logger.info("Creating missing tenant table=%s schema=%s", table.name, schema_name)
+            logger.info(
+                "Creating missing tenant table=%s schema=%s", table.name, schema_name
+            )
             # Ensure search_path still correct (connection pool can reuse sessions in odd ways)
             _set_search_path(conn, schema_name)
             table.create(bind=conn, checkfirst=False)
@@ -206,7 +226,10 @@ def ensure_tenant_tables_exist(db: Session, schema_name: str) -> None:
                 continue
 
             try:
-                existing_columns = {c["name"] for c in inspector.get_columns(table_name, schema=schema_name)}
+                existing_columns = {
+                    c["name"]
+                    for c in inspector.get_columns(table_name, schema=schema_name)
+                }
                 model_columns = {c.name for c in table.columns}
                 missing_columns = model_columns - existing_columns
                 if not missing_columns:
@@ -226,7 +249,9 @@ def ensure_tenant_tables_exist(db: Session, schema_name: str) -> None:
 
                     default_clause = ""
                     # Prefer server_default if present
-                    if col.server_default is not None and hasattr(col.server_default, "arg"):
+                    if col.server_default is not None and hasattr(
+                        col.server_default, "arg"
+                    ):
                         default_arg = str(col.server_default.arg)
                         default_clause = f" DEFAULT {default_arg}"
                     elif col.default is not None and hasattr(col.default, "arg"):
@@ -254,15 +279,29 @@ def ensure_tenant_tables_exist(db: Session, schema_name: str) -> None:
         try:
             inspector = inspect(conn)
             if "patients" in set(inspector.get_table_names(schema=schema_name)):
-                cols = {c["name"] for c in inspector.get_columns("patients", schema=schema_name)}
+                cols = {
+                    c["name"]
+                    for c in inspector.get_columns("patients", schema=schema_name)
+                }
                 if "patient_type" in cols:
-                    conn.execute(text(f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS patient_type'))
+                    conn.execute(
+                        text(
+                            f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS patient_type'
+                        )
+                    )
                 if "department_id" in cols:
                     conn.execute(
-                        text(f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS department_id CASCADE')
+                        text(
+                            f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS department_id CASCADE'
+                        )
                     )
         except Exception as e:
-            logger.warning("Could not clean obsolete columns for schema=%s err=%s", schema_name, e, exc_info=True)
+            logger.warning(
+                "Could not clean obsolete columns for schema=%s err=%s",
+                schema_name,
+                e,
+                exc_info=True,
+            )
 
     except Exception:
         # Let caller decide commit/rollback; do not swallow exceptions
@@ -305,7 +344,9 @@ def _create_tenant_schema_and_tables(db: Session, schema_name: str) -> None:
         existing_tables = inspector.get_table_names(schema=schema_name)
         if existing_tables:
             if settings.hms_dev_allow_tenant_schema_reset:
-                logger.warning("DEV RESET enabled: dropping all objects in schema=%s", schema_name)
+                logger.warning(
+                    "DEV RESET enabled: dropping all objects in schema=%s", schema_name
+                )
                 _drop_schema_objects_for_reset(conn, schema_name)
             else:
                 raise RuntimeError(
@@ -342,7 +383,13 @@ def _create_tenant_schema_and_tables(db: Session, schema_name: str) -> None:
         # Create all tables except appointments, admissions, vitals, prescriptions, and prescription_items first
         # (vitals and prescriptions depend on appointments; prescription_items depends on prescriptions)
         for table in TENANT_TABLES:
-            if table.name in ("appointments", "admissions", "vitals", "prescriptions", "prescription_items"):
+            if table.name in (
+                "appointments",
+                "admissions",
+                "vitals",
+                "prescriptions",
+                "prescription_items",
+            ):
                 continue
             _set_search_path(conn, schema_name)
             table.create(bind=conn, checkfirst=False)
@@ -372,7 +419,10 @@ def _create_tenant_schema_and_tables(db: Session, schema_name: str) -> None:
         )
         """
         conn.execute(text(create_admissions_sql))
-        logger.info("Created tenant table=admissions schema=%s (manual, without cross-FK)", schema_name)
+        logger.info(
+            "Created tenant table=admissions schema=%s (manual, without cross-FK)",
+            schema_name,
+        )
 
         # Create appointments (now can reference admissions)
         _set_search_path(conn, schema_name)
@@ -394,7 +444,11 @@ def _create_tenant_schema_and_tables(db: Session, schema_name: str) -> None:
             )
         except Exception as e:
             # If already exists (or created by earlier attempt), don't fail creation
-            logger.warning("Could not add admissions->appointments FK schema=%s err=%s", schema_name, e)
+            logger.warning(
+                "Could not add admissions->appointments FK schema=%s err=%s",
+                schema_name,
+                e,
+            )
 
         # Now create vitals and prescriptions (they depend on appointments and admissions)
         from app.models.prescription import Prescription, PrescriptionItem
@@ -416,24 +470,43 @@ def _create_tenant_schema_and_tables(db: Session, schema_name: str) -> None:
         # Post-creation cleanup for obsolete columns (best-effort)
         try:
             inspector = inspect(conn)
-            patients_cols = {c["name"] for c in inspector.get_columns("patients", schema=schema_name)}
+            patients_cols = {
+                c["name"] for c in inspector.get_columns("patients", schema=schema_name)
+            }
             if "patient_type" in patients_cols:
-                conn.execute(text(f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS patient_type'))
+                conn.execute(
+                    text(
+                        f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS patient_type'
+                    )
+                )
             if "department_id" in patients_cols:
                 conn.execute(
-                    text(f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS department_id CASCADE')
+                    text(
+                        f'ALTER TABLE "{schema_name}"."patients" DROP COLUMN IF EXISTS department_id CASCADE'
+                    )
                 )
         except Exception as e:
-            logger.warning("Post-creation cleanup failed schema=%s err=%s", schema_name, e, exc_info=True)
+            logger.warning(
+                "Post-creation cleanup failed schema=%s err=%s",
+                schema_name,
+                e,
+                exc_info=True,
+            )
 
     except SQLAlchemyError as exc:
         # Do NOT commit/rollback here beyond ensuring search_path reset.
         # Caller (register_tenant) will handle transaction boundaries.
         ctx = _debug_db_context(conn, schema_name)
         logger.error(
-            "Tenant schema/table creation failed schema=%s ctx=%s err=%s", schema_name, ctx, exc, exc_info=True
+            "Tenant schema/table creation failed schema=%s ctx=%s err=%s",
+            schema_name,
+            ctx,
+            exc,
+            exc_info=True,
         )
-        raise RuntimeError(f"Failed to create tenant schema '{schema_name}': {exc}") from exc
+        raise RuntimeError(
+            f"Failed to create tenant schema '{schema_name}': {exc}"
+        ) from exc
     finally:
         try:
             _reset_search_path(conn)
@@ -478,7 +551,9 @@ def register_tenant(
             schema_name = candidate
             break
     if not schema_name:
-        raise RuntimeError("Could not generate a unique tenant schema name after multiple attempts.")
+        raise RuntimeError(
+            "Could not generate a unique tenant schema name after multiple attempts."
+        )
 
     tenant = Tenant(
         name=name,

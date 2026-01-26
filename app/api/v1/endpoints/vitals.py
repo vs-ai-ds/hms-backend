@@ -39,7 +39,9 @@ def create_vital(
     - recorded_at defaults to now if not provided
     """
     # Check permissions
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in user_roles
     is_nurse = "NURSE" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
@@ -126,7 +128,9 @@ def create_vital(
 )
 def list_vitals(
     patient_id: UUID = Query(..., description="Filter by patient ID"),
-    appointment_id: Optional[UUID] = Query(None, description="Filter by appointment ID"),
+    appointment_id: Optional[UUID] = Query(
+        None, description="Filter by appointment ID"
+    ),
     admission_id: Optional[UUID] = Query(None, description="Filter by admission ID"),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),

@@ -29,7 +29,9 @@ class TenantRole(Base):
     """
 
     __tablename__ = "roles"
-    __table_args__ = {"extend_existing": True}  # Allow redefinition in different schemas
+    __table_args__ = {
+        "extend_existing": True
+    }  # Allow redefinition in different schemas
 
     # Primary Key
     id: Mapped[uuid.UUID] = mapped_column(
@@ -100,7 +102,9 @@ class TenantRolePermission(Base):
     """
 
     __tablename__ = "role_permissions"
-    __table_args__ = {"extend_existing": True}  # Allow redefinition in different schemas
+    __table_args__ = {
+        "extend_existing": True
+    }  # Allow redefinition in different schemas
 
     # Primary Key
     id: Mapped[uuid.UUID] = mapped_column(
@@ -134,7 +138,9 @@ class TenantRolePermission(Base):
     )
 
     # Relationships
-    role: Mapped["TenantRole"] = relationship("TenantRole", back_populates="permissions")
+    role: Mapped["TenantRole"] = relationship(
+        "TenantRole", back_populates="permissions"
+    )
 
 
 class TenantUserRole(Base):

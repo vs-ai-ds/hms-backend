@@ -5,7 +5,14 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from app.models.stock import StockItemType
 
@@ -165,14 +172,23 @@ class StockItemUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_bundle_rule_if_touched(self) -> "StockItemUpdate":
-        touched = any(v is not None for v in (self.default_dosage, self.default_frequency, self.default_duration))
+        touched = any(
+            v is not None
+            for v in (
+                self.default_dosage,
+                self.default_frequency,
+                self.default_duration,
+            )
+        )
         if not touched:
             return self
 
         trio = [self.default_dosage, self.default_frequency, self.default_duration]
         filled = sum(1 for x in trio if x is not None)
         if 0 < filled < 3:
-            raise ValueError("Please provide default_dosage, default_frequency, and default_duration together")
+            raise ValueError(
+                "Please provide default_dosage, default_frequency, and default_duration together"
+            )
 
         return self
 

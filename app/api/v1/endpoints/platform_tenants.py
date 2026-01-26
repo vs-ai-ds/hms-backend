@@ -46,7 +46,12 @@ def debug_tenant_metrics(
     from app.models.tenant_global import Tenant
 
     actual_tenant_count = db.query(func.count(Tenant.id)).scalar() or 0
-    actual_user_count = db.query(func.count(User.id)).filter(User.tenant_id.isnot(None), User.is_deleted).scalar() or 0
+    actual_user_count = (
+        db.query(func.count(User.id))
+        .filter(User.tenant_id.isnot(None), User.is_deleted)
+        .scalar()
+        or 0
+    )
 
     return {
         "exists": True,
@@ -57,7 +62,9 @@ def debug_tenant_metrics(
             "total_patients": metrics.total_patients,
             "total_appointments": metrics.total_appointments,
             "total_prescriptions": metrics.total_prescriptions,
-            "updated_at": metrics.updated_at.isoformat() if metrics.updated_at else None,
+            "updated_at": metrics.updated_at.isoformat()
+            if metrics.updated_at
+            else None,
         },
         "actual_counts": {
             "tenants": actual_tenant_count,
@@ -114,7 +121,9 @@ def list_tenants(
             status_enum = TenantStatus(status_filter)
             query = query.filter(Tenant.status == status_enum)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status_filter}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid status: {status_filter}"
+            )
 
     if search:
         search_term = f"%{search.strip()}%"
@@ -129,7 +138,9 @@ def list_tenants(
 
     # Pagination
     offset = (page - 1) * page_size
-    tenants = query.order_by(Tenant.created_at.desc()).offset(offset).limit(page_size).all()
+    tenants = (
+        query.order_by(Tenant.created_at.desc()).offset(offset).limit(page_size).all()
+    )
 
     # Build response with user counts
     from sqlalchemy import text
@@ -160,7 +171,9 @@ def list_tenants(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.warning(f"Could not query patient count for tenant {tenant.name} (schema {tenant.schema_name}): {e}")
+            logger.warning(
+                f"Could not query patient count for tenant {tenant.name} (schema {tenant.schema_name}): {e}"
+            )
         finally:
             # Restore original search_path for next iteration
             conn.execute(text(f"SET search_path TO {original_path}"))
@@ -315,13 +328,18 @@ def get_tenant_details(
         total_prescriptions = db.query(func.count(Prescription.id)).scalar() or 0
         total_admissions = db.query(func.count(Admission.id)).scalar() or 0
         active_admissions = (
-            db.query(func.count(Admission.id)).filter(Admission.status == AdmissionStatus.ACTIVE).scalar() or 0
+            db.query(func.count(Admission.id))
+            .filter(Admission.status == AdmissionStatus.ACTIVE)
+            .scalar()
+            or 0
         )
     except Exception as e:
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Could not query metrics for tenant {tenant.name} (schema {tenant.schema_name}): {e}")
+        logger.warning(
+            f"Could not query metrics for tenant {tenant.name} (schema {tenant.schema_name}): {e}"
+        )
     finally:
         conn.execute(text(f"SET search_path TO {original_path}"))
 
@@ -344,7 +362,9 @@ def get_tenant_details(
 )
 def set_tenant_limits(
     tenant_id: UUID,
-    max_users: Optional[int] = Query(None, ge=1, description="Maximum number of users allowed (null = unlimited)"),
+    max_users: Optional[int] = Query(
+        None, ge=1, description="Maximum number of users allowed (null = unlimited)"
+    ),
     max_patients: Optional[int] = Query(
         None, ge=1, description="Maximum number of patients allowed (null = unlimited)"
     ),
@@ -440,7 +460,9 @@ def reset_tenant_admin_password(
 
     admin_user = None
     for user in admin_users:
-        user_roles = get_user_role_names(db, user, tenant_schema_name=tenant.schema_name)
+        user_roles = get_user_role_names(
+            db, user, tenant_schema_name=tenant.schema_name
+        )
         if "HOSPITAL_ADMIN" in user_roles:
             admin_user = user
             break
@@ -510,7 +532,9 @@ def refresh_demo_data(
     import sys
     from pathlib import Path
 
-    script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "seed_demo_data.py"
+    script_path = (
+        Path(__file__).parent.parent.parent.parent / "scripts" / "seed_demo_data.py"
+    )
 
     try:
         # Run freshen (which will also seed if missing)

@@ -5,7 +5,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.notification import Notification, NotificationChannel, NotificationStatus
+from app.models.notification import (
+    Notification,
+    NotificationChannel,
+    NotificationStatus,
+)
 from app.models.user import User
 from app.notifications.email.base import send_email
 from app.notifications.sms.base import send_sms
@@ -27,7 +31,9 @@ def _resolve_tenant_schema_name(
         try:
             from app.models.tenant import Tenant
 
-            tenant = db.query(Tenant).filter(Tenant.id == triggered_by.tenant_id).first()
+            tenant = (
+                db.query(Tenant).filter(Tenant.id == triggered_by.tenant_id).first()
+            )
             if tenant and tenant.schema_name:
                 return tenant.schema_name
         except Exception:
@@ -60,7 +66,9 @@ def _log_notification(
 
     log_message = message or ""
     if len(log_message) > 2000:
-        if log_message.strip().startswith("<!DOCTYPE") or log_message.strip().startswith("<html"):
+        if log_message.strip().startswith(
+            "<!DOCTYPE"
+        ) or log_message.strip().startswith("<html"):
             log_message = f"[HTML Email - {reason or 'email'}] Subject: {subject or 'N/A'}. Email sent."
         else:
             log_message = log_message[:1997] + "..."
@@ -85,10 +93,14 @@ def _log_notification(
             return notif
 
     except SQLAlchemyError as e:
-        logger.warning(f"[NOTIFICATION LOG ERROR] Failed to log notification: {e}", exc_info=True)
+        logger.warning(
+            f"[NOTIFICATION LOG ERROR] Failed to log notification: {e}", exc_info=True
+        )
         return None
     except Exception as e:
-        logger.warning(f"[NOTIFICATION LOG ERROR] Failed to log notification: {e}", exc_info=True)
+        logger.warning(
+            f"[NOTIFICATION LOG ERROR] Failed to log notification: {e}", exc_info=True
+        )
         return None
 
 
@@ -116,14 +128,18 @@ def send_notification_email(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Email to patient skipped (SEND_EMAIL_TO_PATIENTS=False): {to_email}, Subject: {subject}")
+        logger.warning(
+            f"Email to patient skipped (SEND_EMAIL_TO_PATIENTS=False): {to_email}, Subject: {subject}"
+        )
         # Still log the notification attempt as skipped
         _log_notification(
             db,
             channel=NotificationChannel.EMAIL,
             recipient=to_email,
             subject=subject,
-            message=body[:200] + "..." if len(body) > 200 else body,  # Truncate for logging
+            message=body[:200] + "..."
+            if len(body) > 200
+            else body,  # Truncate for logging
             triggered_by=triggered_by,
             status=NotificationStatus.PENDING,
             error_message="Skipped: SEND_EMAIL_TO_PATIENTS=False",
@@ -133,7 +149,14 @@ def send_notification_email(
         return
 
     try:
-        send_email(to_email=to_email, subject=subject, body=body, reason=reason, html=html, attachments=attachments)
+        send_email(
+            to_email=to_email,
+            subject=subject,
+            body=body,
+            reason=reason,
+            html=html,
+            attachments=attachments,
+        )
         _log_notification(
             db,
             channel=NotificationChannel.EMAIL,
@@ -149,7 +172,10 @@ def send_notification_email(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to send email to {to_email}, Subject: {subject}, Error: {exc}", exc_info=True)
+        logger.error(
+            f"Failed to send email to {to_email}, Subject: {subject}, Error: {exc}",
+            exc_info=True,
+        )
         _log_notification(
             db,
             channel=NotificationChannel.EMAIL,

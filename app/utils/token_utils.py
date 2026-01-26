@@ -81,7 +81,9 @@ def verify_token(db: Session, token: str) -> Optional[VerificationToken]:
     Verify a token and return the VerificationToken if valid.
     Returns None if token is invalid, expired, or already used.
     """
-    verification = db.query(VerificationToken).filter(VerificationToken.token == token).first()
+    verification = (
+        db.query(VerificationToken).filter(VerificationToken.token == token).first()
+    )
     if not verification:
         return None
 

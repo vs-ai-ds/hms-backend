@@ -49,7 +49,9 @@ def create_patient_quick_register(
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.error(f"Could not ensure tenant tables exist: {e}", exc_info=True)
+                logger.error(
+                    f"Could not ensure tenant tables exist: {e}", exc_info=True
+                )
 
     # Check for duplicates
     duplicate_candidates = find_duplicate_candidates(

@@ -38,15 +38,21 @@ def authenticate_user(
 
     # Check if user is active
     if not user.is_active:
-        raise AuthenticationError("Account is inactive. Please contact your administrator.")
+        raise AuthenticationError(
+            "Account is inactive. Please contact your administrator."
+        )
 
     # Check user status
     from app.models.user import UserStatus
 
     if user.status == UserStatus.LOCKED:
-        raise AuthenticationError("Account is locked. Please contact your administrator.")
+        raise AuthenticationError(
+            "Account is locked. Please contact your administrator."
+        )
     elif user.status == UserStatus.PASSWORD_EXPIRED:
-        raise AuthenticationError("Your password has expired. Please reset your password.")
+        raise AuthenticationError(
+            "Your password has expired. Please reset your password."
+        )
 
     if not verify_password(login_data.password, user.hashed_password):
         raise AuthenticationError("Invalid email or password")
@@ -85,16 +91,27 @@ def authenticate_user(
             # Production mode: require email verification
             if not user.email_verified:
                 raise AuthenticationError("Please verify your email before logging in.")
-            if tenant.status == TenantStatus.PENDING or tenant.status == TenantStatus.VERIFIED:
-                raise AuthenticationError("Hospital registration is not fully activated yet. Please verify your email.")
+            if (
+                tenant.status == TenantStatus.PENDING
+                or tenant.status == TenantStatus.VERIFIED
+            ):
+                raise AuthenticationError(
+                    "Hospital registration is not fully activated yet. Please verify your email."
+                )
 
         # Check for suspended/inactive status (applies in both modes)
         if tenant.status == TenantStatus.SUSPENDED:
-            raise AuthenticationError("Hospital account is suspended. Please contact support.")
+            raise AuthenticationError(
+                "Hospital account is suspended. Please contact support."
+            )
         elif tenant.status == TenantStatus.INACTIVE:
-            raise AuthenticationError("Hospital account is inactive. Please contact support.")
+            raise AuthenticationError(
+                "Hospital account is inactive. Please contact support."
+            )
         elif tenant.status != TenantStatus.ACTIVE:
-            raise AuthenticationError("Hospital account is not active. Please contact support.")
+            raise AuthenticationError(
+                "Hospital account is not active. Please contact support."
+            )
     else:
         # For SUPER_ADMIN or users without tenant_id
         # In production mode, still require email verification

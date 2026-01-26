@@ -63,4 +63,3 @@ def tenant_schema_session(schema_name: str) -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
-        

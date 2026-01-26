@@ -11,7 +11,9 @@ from app.models.tenant_role import TenantRole, TenantUserRole
 from app.models.user import User
 
 
-def get_user_role_names(db: Session, user: User, tenant_schema_name: str | None = None) -> set[str]:
+def get_user_role_names(
+    db: Session, user: User, tenant_schema_name: str | None = None
+) -> set[str]:
     """
     Get user's role names from tenant schema.
     Returns a set of role name strings.

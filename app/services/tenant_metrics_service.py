@@ -79,7 +79,10 @@ def recalculate_all_metrics(db: Session) -> None:
 
     # Count users (all, not deleted)
     metrics.total_users = (
-        db.query(func.count(User.id)).filter(User.tenant_id.isnot(None), User.is_deleted == False).scalar() or 0
+        db.query(func.count(User.id))
+        .filter(User.tenant_id.isnot(None), User.is_deleted.is_(False))
+        .scalar()
+        or 0
     )
 
     # Aggregate across all tenant schemas
@@ -102,7 +105,9 @@ def recalculate_all_metrics(db: Session) -> None:
                 appointments_count = db.query(func.count(Appointment.id)).scalar() or 0
                 total_appointments += appointments_count
 
-                prescriptions_count = db.query(func.count(Prescription.id)).scalar() or 0
+                prescriptions_count = (
+                    db.query(func.count(Prescription.id)).scalar() or 0
+                )
                 total_prescriptions += prescriptions_count
             except Exception as e:
                 import logging

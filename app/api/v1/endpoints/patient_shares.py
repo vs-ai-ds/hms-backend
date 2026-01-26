@@ -51,10 +51,15 @@ def list_tenants_for_sharing(
 
     if search:
         search_term = f"%{search.strip()}%"
-        query = query.filter(Tenant.name.ilike(search_term) | Tenant.contact_email.ilike(search_term))
+        query = query.filter(
+            Tenant.name.ilike(search_term) | Tenant.contact_email.ilike(search_term)
+        )
 
     tenants = query.order_by(Tenant.name.asc()).limit(50).all()
-    return [TenantOption(id=t.id, name=t.name, contact_email=t.contact_email) for t in tenants]
+    return [
+        TenantOption(id=t.id, name=t.name, contact_email=t.contact_email)
+        for t in tenants
+    ]
 
 
 @router.post(
@@ -86,11 +91,13 @@ def create_patient_share_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Target hospital is required.",
         )
-    
-    target_tenant = db.query(Tenant).filter(Tenant.id == payload.target_tenant_id).first()
+
+    target_tenant = (
+        db.query(Tenant).filter(Tenant.id == payload.target_tenant_id).first()
+    )
     if not target_tenant:
         raise HTTPException(status_code=404, detail="Target tenant not found")
-    
+
     # Ensure target tenant is active
     if target_tenant.status != "ACTIVE":
         raise HTTPException(
@@ -133,13 +140,24 @@ def create_patient_share_endpoint(
         from app.services.notification_service import send_notification_email
         from app.utils.email_templates import render_email_template
         from app.core.config import get_settings
-        
+
         settings = get_settings()
 
-        share_mode_text = "Read-only Link" if payload.share_mode.value == "READ_ONLY_LINK" else "Write-enabled (Create Record)"
-        expires_text = f"Expires: {share.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}" if share.expires_at else "Never expires"
-        created_by_name = f"{ctx.user.first_name} {ctx.user.last_name or ''}".strip() or ctx.user.email
-        
+        share_mode_text = (
+            "Read-only Link"
+            if payload.share_mode.value == "READ_ONLY_LINK"
+            else "Write-enabled (Create Record)"
+        )
+        expires_text = (
+            f"Expires: {share.expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            if share.expires_at
+            else "Never expires"
+        )
+        created_by_name = (
+            f"{ctx.user.first_name} {ctx.user.last_name or ''}".strip()
+            or ctx.user.email
+        )
+
         # Email body content
         email_body_html = f"""
         <p>Dear {{recipient_name}},</p>
@@ -161,7 +179,7 @@ def create_patient_share_endpoint(
                     <td style="padding: 8px; font-weight: bold;">Patient Name:</td>
                     <td style="padding: 8px;">{patient_name}</td>
                 </tr>
-                {f'<tr><td style="padding: 8px; font-weight: bold;">Patient Code:</td><td style="padding: 8px;">{patient_code}</td></tr>' if patient_code else ''}
+                {f'<tr><td style="padding: 8px; font-weight: bold;">Patient Code:</td><td style="padding: 8px;">{patient_code}</td></tr>' if patient_code else ""}
                 <tr>
                     <td style="padding: 8px; font-weight: bold;">Shared By:</td>
                     <td style="padding: 8px;">{created_by_name}</td>
@@ -172,13 +190,13 @@ def create_patient_share_endpoint(
                 </tr>
                 <tr>
                     <td style="padding: 8px; font-weight: bold;">Shared Date & Time:</td>
-                    <td style="padding: 8px;">{share.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')}</td>
+                    <td style="padding: 8px;">{share.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")}</td>
                 </tr>
                 <tr>
                     <td style="padding: 8px; font-weight: bold;">Validity:</td>
                     <td style="padding: 8px;">{expires_text}</td>
                 </tr>
-                {f'<tr><td style="padding: 8px; font-weight: bold;">Note:</td><td style="padding: 8px;">{share.note}</td></tr>' if share.note else ''}
+                {f'<tr><td style="padding: 8px; font-weight: bold;">Note:</td><td style="padding: 8px;">{share.note}</td></tr>' if share.note else ""}
             </table>
         </div>
         
@@ -186,20 +204,22 @@ def create_patient_share_endpoint(
             {{action_message}}
         </p>
         """
-        
+
         # Send email to target hospital
         if target_tenant and target_tenant.contact_email:
             try:
-                hospital_email_body = email_body_html.replace("{recipient_name}", target_tenant.name).replace(
-                    "{action_message}", 
-                    f'Please log in to your HMS account to view the shared patient record in the "Shared Patients" section.'
+                hospital_email_body = email_body_html.replace(
+                    "{recipient_name}", target_tenant.name
+                ).replace(
+                    "{action_message}",
+                    'Please log in to your HMS account to view the shared patient record in the "Shared Patients" section.',
                 )
                 hospital_email_html = render_email_template(
                     title="Patient Record Shared",
                     body_html=hospital_email_body,
                     hospital_name=target_tenant.name,
                 )
-                
+
                 send_notification_email(
                     db=db,
                     to_email=target_tenant.contact_email,
@@ -211,8 +231,11 @@ def create_patient_share_endpoint(
                     html=True,
                 )
             except Exception as e:
-                logger.warning(f"Failed to send share notification email to hospital: {e}", exc_info=True)
-        
+                logger.warning(
+                    f"Failed to send share notification email to hospital: {e}",
+                    exc_info=True,
+                )
+
         # Send email to patient if email exists and consent given
         patient_email = None
         try:
@@ -220,7 +243,7 @@ def create_patient_share_endpoint(
             original_path = conn.execute(text("SHOW search_path")).scalar()
             conn.execute(text(f'SET search_path TO "{ctx.tenant.schema_name}", public'))
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
-            if patient and patient.email and getattr(patient, 'consent_email', False):
+            if patient and patient.email and getattr(patient, "consent_email", False):
                 patient_email = patient.email
         except Exception as e:
             logger.warning(f"Failed to fetch patient email: {e}", exc_info=True)
@@ -229,20 +252,22 @@ def create_patient_share_endpoint(
                 conn.execute(text(f"SET search_path TO {original_path}"))
             except Exception:
                 pass
-        
+
         if patient_email:
             try:
-                patient_email_body = email_body_html.replace("{recipient_name}", patient_name).replace(
+                patient_email_body = email_body_html.replace(
+                    "{recipient_name}", patient_name
+                ).replace(
                     "{action_message}",
                     f"Your medical record has been shared with <strong>{target_tenant.name}</strong> for continuity of care. "
-                    f"If you have any concerns, please contact {ctx.tenant.name}."
+                    f"If you have any concerns, please contact {ctx.tenant.name}.",
                 )
                 patient_email_html = render_email_template(
                     title="Your Medical Record Has Been Shared",
                     body_html=patient_email_body,
                     hospital_name=ctx.tenant.name,
                 )
-                
+
                 send_notification_email(
                     db=db,
                     to_email=patient_email,
@@ -255,27 +280,39 @@ def create_patient_share_endpoint(
                     check_patient_flag=True,  # Respect SEND_EMAIL_TO_PATIENTS setting
                 )
             except Exception as e:
-                logger.warning(f"Failed to send share notification email to patient: {e}", exc_info=True)
+                logger.warning(
+                    f"Failed to send share notification email to patient: {e}",
+                    exc_info=True,
+                )
 
         # Build response
         response_dict = PatientShareResponse.model_validate(share).model_dump()
-        source_tenant = db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        source_tenant = (
+            db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        )
         if source_tenant:
             response_dict["source_tenant_name"] = source_tenant.name
         if share.target_tenant_id:
-            target_tenant = db.query(Tenant).filter(Tenant.id == share.target_tenant_id).first()
+            target_tenant = (
+                db.query(Tenant).filter(Tenant.id == share.target_tenant_id).first()
+            )
             if target_tenant:
                 response_dict["target_tenant_name"] = target_tenant.name
-        
+
         # Add created by user name
-        created_by_user = db.query(User).filter(User.id == share.created_by_user_id).first()
+        created_by_user = (
+            db.query(User).filter(User.id == share.created_by_user_id).first()
+        )
         if created_by_user:
-            response_dict["created_by_user_name"] = f"{created_by_user.first_name} {created_by_user.last_name or ''}".strip() or created_by_user.email
-        
+            response_dict["created_by_user_name"] = (
+                f"{created_by_user.first_name} {created_by_user.last_name or ''}".strip()
+                or created_by_user.email
+            )
+
         # Add patient name and code
         response_dict["patient_name"] = patient_name
         response_dict["patient_code"] = patient_code
-        
+
         return PatientShareResponse(**response_dict)
 
     except ValueError as e:
@@ -352,25 +389,28 @@ def get_shared_patient_data(
     share = db.query(PatientShare).filter(PatientShare.id == share_id).first()
     if not share:
         raise HTTPException(status_code=404, detail="Share not found")
-    
+
     # Check if user's tenant is either source or target
-    if share.source_tenant_id != ctx.tenant.id and share.target_tenant_id != ctx.tenant.id:
+    if (
+        share.source_tenant_id != ctx.tenant.id
+        and share.target_tenant_id != ctx.tenant.id
+    ):
         raise HTTPException(
             status_code=403,
             detail="You can only view shares for your hospital.",
         )
-    
+
     # Check if share is active and not revoked
     if share.status != ShareStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Share is not active")
-    
+
     if share.expires_at:
         now = datetime.now(timezone.utc)
         if share.expires_at < now:
             share.status = ShareStatus.EXPIRED
             db.commit()
             raise HTTPException(status_code=403, detail="Share has expired")
-    
+
     try:
         summary = get_shared_patient_summary(db=db, share_id=share.id, token=None)
         return summary
@@ -395,60 +435,68 @@ def import_patient_share_endpoint(
     """
     from app.models.patient_share import PatientShareLink
     from app.utils.id_generators import generate_patient_code
-    
+
     share = db.query(PatientShare).filter(PatientShare.id == share_id).first()
     if not share:
         raise HTTPException(status_code=404, detail="Share not found")
-    
+
     if share.target_tenant_id != ctx.tenant.id:
         raise HTTPException(
             status_code=403,
             detail="You can only import shares received by your hospital.",
         )
-    
+
     if share.share_mode.value != "CREATE_RECORD":
         raise HTTPException(
             status_code=400,
             detail="Only CREATE_RECORD mode shares can be imported.",
         )
-    
+
     if share.status != ShareStatus.ACTIVE:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot import share with status {share.status.value}.",
         )
-    
+
     # Check if already imported
-    existing_link = db.query(PatientShareLink).filter(
-        PatientShareLink.share_id == share_id,
-        PatientShareLink.target_tenant_id == ctx.tenant.id
-    ).first()
-    
+    existing_link = (
+        db.query(PatientShareLink)
+        .filter(
+            PatientShareLink.share_id == share_id,
+            PatientShareLink.target_tenant_id == ctx.tenant.id,
+        )
+        .first()
+    )
+
     if existing_link:
         # Already imported, return existing
         response_dict = PatientShareResponse.model_validate(share).model_dump()
         response_dict["target_patient_id"] = existing_link.target_patient_id
         return PatientShareResponse(**response_dict)
-    
+
     # Import only patient data (not visit history - appointments/prescriptions/admissions)
     # Visit history is from source hospital and should not be imported
     conn = db.connection()
     original_path = conn.execute(text("SHOW search_path")).scalar()
-    
+
     try:
         # Get source patient
-        source_tenant = db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        source_tenant = (
+            db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        )
         if not source_tenant:
             raise ValueError("Source tenant not found")
-        
+
         conn.execute(text(f'SET search_path TO "{source_tenant.schema_name}", public'))
-        source_patient = db.query(Patient).filter(Patient.id == share.patient_id).first()
+        source_patient = (
+            db.query(Patient).filter(Patient.id == share.patient_id).first()
+        )
         if not source_patient:
             raise ValueError("Source patient not found")
-        
+
         # Switch to target tenant and create patient
         conn.execute(text(f'SET search_path TO "{ctx.tenant.schema_name}", public'))
-        
+
         target_patient = Patient(
             first_name=source_patient.first_name,
             last_name=source_patient.last_name,
@@ -483,11 +531,11 @@ def import_patient_share_endpoint(
         db.add(target_patient)
         db.flush()  # Get ID without committing
         target_patient_id = target_patient.id
-        
+
         # Import vitals (they are not associated with appointments/prescriptions/departments/doctors)
         from app.models.vital import Vital
         from app.services.patient_share_service import get_shared_patient_summary
-        
+
         summary = get_shared_patient_summary(db=db, share_id=share_id, token=None)
         for vital_data in summary.vitals:
             if vital_data.get("recorded_at"):
@@ -496,17 +544,20 @@ def import_patient_share_endpoint(
                     recorded_at_str = vital_data["recorded_at"]
                     if recorded_at_str:
                         try:
-                            recorded_at = datetime.fromisoformat(recorded_at_str.replace('Z', '+00:00'))
+                            recorded_at = datetime.fromisoformat(
+                                recorded_at_str.replace("Z", "+00:00")
+                            )
                         except (ValueError, AttributeError):
                             # Fallback to simple parsing
                             from datetime import date as date_type
+
                             recorded_at = datetime.combine(
-                                date_type.fromisoformat(recorded_at_str.split('T')[0]),
-                                datetime.min.time()
+                                date_type.fromisoformat(recorded_at_str.split("T")[0]),
+                                datetime.min.time(),
                             )
                     else:
                         continue
-                    
+
                     vital = Vital(
                         patient_id=target_patient_id,
                         recorded_at=recorded_at,
@@ -523,9 +574,9 @@ def import_patient_share_endpoint(
                     db.add(vital)
                 except Exception as e:
                     logger.warning(f"Failed to import vital: {e}", exc_info=True)
-        
+
         db.flush()
-        
+
         # Create share link
         link = PatientShareLink(
             share_id=share.id,
@@ -537,15 +588,19 @@ def import_patient_share_endpoint(
         db.add(link)
         db.commit()
         ensure_search_path(db, ctx.tenant.schema_name)
-        
+
         response_dict = PatientShareResponse.model_validate(share).model_dump()
         response_dict["target_patient_id"] = target_patient_id
         return PatientShareResponse(**response_dict)
-        
+
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to import patient for share {share_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to import patient: {str(e)}")
+        logger.error(
+            f"Failed to import patient for share {share_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to import patient: {str(e)}"
+        )
     finally:
         try:
             conn.execute(text(f"SET search_path TO {original_path}"))
@@ -605,7 +660,8 @@ def list_patient_shares(
     Shows shares created by this tenant (source) and shares received (target).
     """
     query = db.query(PatientShare).filter(
-        (PatientShare.source_tenant_id == ctx.tenant.id) | (PatientShare.target_tenant_id == ctx.tenant.id)
+        (PatientShare.source_tenant_id == ctx.tenant.id)
+        | (PatientShare.target_tenant_id == ctx.tenant.id)
     )
 
     if patient_id:
@@ -616,47 +672,70 @@ def list_patient_shares(
     results = []
     conn = db.connection()
     original_path = conn.execute(text("SHOW search_path")).scalar()
-    
+
     for share in shares:
         share_dict = PatientShareResponse.model_validate(share).model_dump()
-        
+
         # Get tenant names
-        source_tenant = db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        source_tenant = (
+            db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+        )
         if source_tenant:
             share_dict["source_tenant_name"] = source_tenant.name
         if share.target_tenant_id:
-            target_tenant = db.query(Tenant).filter(Tenant.id == share.target_tenant_id).first()
+            target_tenant = (
+                db.query(Tenant).filter(Tenant.id == share.target_tenant_id).first()
+            )
             if target_tenant:
                 share_dict["target_tenant_name"] = target_tenant.name
-            
+
             # Get target patient ID from PatientShareLink if CREATE_RECORD mode
             if share.share_mode.value == "CREATE_RECORD":
-                link = db.query(PatientShareLink).filter(
-                    PatientShareLink.share_id == share.id,
-                    PatientShareLink.target_tenant_id == share.target_tenant_id
-                ).first()
+                link = (
+                    db.query(PatientShareLink)
+                    .filter(
+                        PatientShareLink.share_id == share.id,
+                        PatientShareLink.target_tenant_id == share.target_tenant_id,
+                    )
+                    .first()
+                )
                 if link:
                     share_dict["target_patient_id"] = link.target_patient_id
-        
+
         # Get created by user name
-        created_by_user = db.query(User).filter(User.id == share.created_by_user_id).first()
+        created_by_user = (
+            db.query(User).filter(User.id == share.created_by_user_id).first()
+        )
         if created_by_user:
-            share_dict["created_by_user_name"] = f"{created_by_user.first_name} {created_by_user.last_name or ''}".strip() or created_by_user.email
-        
+            share_dict["created_by_user_name"] = (
+                f"{created_by_user.first_name} {created_by_user.last_name or ''}".strip()
+                or created_by_user.email
+            )
+
         # Get patient name and code from source tenant
         try:
-            source_tenant = db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+            source_tenant = (
+                db.query(Tenant).filter(Tenant.id == share.source_tenant_id).first()
+            )
             if source_tenant:
-                conn.execute(text(f'SET search_path TO "{source_tenant.schema_name}", public'))
-                patient = db.query(Patient).filter(Patient.id == share.patient_id).first()
+                conn.execute(
+                    text(f'SET search_path TO "{source_tenant.schema_name}", public')
+                )
+                patient = (
+                    db.query(Patient).filter(Patient.id == share.patient_id).first()
+                )
                 if patient:
-                    share_dict["patient_name"] = f"{patient.first_name} {patient.last_name or ''}".strip()
+                    share_dict["patient_name"] = (
+                        f"{patient.first_name} {patient.last_name or ''}".strip()
+                    )
                     share_dict["patient_code"] = patient.patient_code
         except Exception as e:
-            logger.warning(f"Failed to fetch patient info for share {share.id}: {e}", exc_info=True)
-        
+            logger.warning(
+                f"Failed to fetch patient info for share {share.id}: {e}", exc_info=True
+            )
+
         results.append(PatientShareResponse(**share_dict))
-    
+
     # Restore search_path
     try:
         conn.execute(text(f"SET search_path TO {original_path}"))

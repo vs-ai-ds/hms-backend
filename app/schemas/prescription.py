@@ -23,8 +23,12 @@ class PrescriptionCreate(BaseModel):
     patient_id: UUID
     appointment_id: UUID | None = None
     admission_id: UUID | None = None
-    doctor_user_id: UUID | None = None  # Optional: for non-doctor users creating prescriptions
-    department_id: UUID | None = None  # Optional: for walk-in appointments when user is not a doctor
+    doctor_user_id: UUID | None = (
+        None  # Optional: for non-doctor users creating prescriptions
+    )
+    department_id: UUID | None = (
+        None  # Optional: for walk-in appointments when user is not a doctor
+    )
     chief_complaint: str | None = None
     diagnosis: str | None = None
     items: list[PrescriptionItemCreate]

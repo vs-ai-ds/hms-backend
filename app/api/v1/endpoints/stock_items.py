@@ -22,7 +22,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _reload_stock_item(db: Session, stock_item_id: UUID, tenant_schema_name: str) -> StockItem:
+def _reload_stock_item(
+    db: Session, stock_item_id: UUID, tenant_schema_name: str
+) -> StockItem:
     """
     Re-query after commit so we return a fresh, attached ORM object
     and avoid expired/lazy-load surprises after transaction boundaries.
@@ -38,12 +40,22 @@ def _reload_stock_item(db: Session, stock_item_id: UUID, tenant_schema_name: str
 
 @router.get("", response_model=list[StockItemResponse], tags=["stock-items"])
 def list_stock_items(
-    search: Optional[str] = Query(None, description="Search by name or generic_name (case-insensitive)"),
-    type: Optional[StockItemType] = Query(None, description="Filter by type (MEDICINE, EQUIPMENT, or CONSUMABLE)"),
+    search: Optional[str] = Query(
+        None, description="Search by name or generic_name (case-insensitive)"
+    ),
+    type: Optional[StockItemType] = Query(
+        None, description="Filter by type (MEDICINE, EQUIPMENT, or CONSUMABLE)"
+    ),
     limit: int = Query(20, ge=1, le=50, description="Maximum number of results"),
-    include_inactive: bool = Query(False, description="Include inactive items (requires manage permission)"),
-    sort_by: Optional[str] = Query(None, description="Sort by field: 'name', 'type', or 'current_stock'"),
-    sort_dir: Optional[str] = Query("asc", description="Sort direction: 'asc' or 'desc'"),
+    include_inactive: bool = Query(
+        False, description="Include inactive items (requires manage permission)"
+    ),
+    sort_by: Optional[str] = Query(
+        None, description="Sort by field: 'name', 'type', or 'current_stock'"
+    ),
+    sort_dir: Optional[str] = Query(
+        "asc", description="Sort direction: 'asc' or 'desc'"
+    ),
     current_user: User = Depends(require_permission("stock_items:view")),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
@@ -84,11 +96,19 @@ def list_stock_items(
         desc = sort_dir_lower == "desc"
 
         if sort_by == "name":
-            query = query.order_by(StockItem.name.desc() if desc else StockItem.name.asc())
+            query = query.order_by(
+                StockItem.name.desc() if desc else StockItem.name.asc()
+            )
         elif sort_by == "type":
-            query = query.order_by(StockItem.type.desc() if desc else StockItem.type.asc())
+            query = query.order_by(
+                StockItem.type.desc() if desc else StockItem.type.asc()
+            )
         elif sort_by == "current_stock":
-            query = query.order_by(StockItem.current_stock.desc() if desc else StockItem.current_stock.asc())
+            query = query.order_by(
+                StockItem.current_stock.desc()
+                if desc
+                else StockItem.current_stock.asc()
+            )
         else:
             query = query.order_by(StockItem.name.asc())
 
@@ -105,7 +125,10 @@ def list_stock_items(
         try:
             result.append(StockItemResponse.model_validate(item))
         except Exception:
-            logger.exception("Skipping stock item due to validation error item_id=%s", getattr(item, "id", None))
+            logger.exception(
+                "Skipping stock item due to validation error item_id=%s",
+                getattr(item, "id", None),
+            )
             continue
     return result
 
@@ -241,16 +264,28 @@ def update_stock_item(
         )
 
         if updating_medicine_fields or payload.type is not None:
-            effective_form = payload.form if payload.form is not None else stock_item.form
-            effective_strength = payload.strength if payload.strength is not None else stock_item.strength
+            effective_form = (
+                payload.form if payload.form is not None else stock_item.form
+            )
+            effective_strength = (
+                payload.strength
+                if payload.strength is not None
+                else stock_item.strength
+            )
             effective_dosage = (
-                payload.default_dosage if payload.default_dosage is not None else stock_item.default_dosage
+                payload.default_dosage
+                if payload.default_dosage is not None
+                else stock_item.default_dosage
             )
             effective_frequency = (
-                payload.default_frequency if payload.default_frequency is not None else stock_item.default_frequency
+                payload.default_frequency
+                if payload.default_frequency is not None
+                else stock_item.default_frequency
             )
             effective_duration = (
-                payload.default_duration if payload.default_duration is not None else stock_item.default_duration
+                payload.default_duration
+                if payload.default_duration is not None
+                else stock_item.default_duration
             )
 
             errors: list[str] = []
@@ -281,7 +316,9 @@ def update_stock_item(
     # Uniqueness check
     effective_name = payload.name if payload.name is not None else stock_item.name
     effective_form = payload.form if payload.form is not None else stock_item.form
-    effective_strength = payload.strength if payload.strength is not None else stock_item.strength
+    effective_strength = (
+        payload.strength if payload.strength is not None else stock_item.strength
+    )
 
     if (
         effective_type != stock_item.type
@@ -362,12 +399,21 @@ def update_stock_item(
             for admin in admins:
                 # roles may be relationship; protect against lazy-load failures
                 try:
-                    user_roles = [r.name for r in admin.roles] if hasattr(admin, "roles") and admin.roles else []
+                    user_roles = (
+                        [r.name for r in admin.roles]
+                        if hasattr(admin, "roles") and admin.roles
+                        else []
+                    )
                 except Exception:
-                    logger.exception("Failed to read roles for admin_id=%s while sending low stock email", admin.id)
+                    logger.exception(
+                        "Failed to read roles for admin_id=%s while sending low stock email",
+                        admin.id,
+                    )
                     user_roles = []
 
-                if ("HOSPITAL_ADMIN" in user_roles or "PHARMACIST" in user_roles) and admin.email:
+                if (
+                    "HOSPITAL_ADMIN" in user_roles or "PHARMACIST" in user_roles
+                ) and admin.email:
                     try:
                         send_notification_email(
                             db=db,
@@ -382,8 +428,14 @@ def update_stock_item(
                             tenant_schema_name=ctx.tenant.schema_name,
                         )
                     except Exception:
-                        logger.exception("Low stock email failed to=%s item_id=%s", admin.email, stock_item.id)
+                        logger.exception(
+                            "Low stock email failed to=%s item_id=%s",
+                            admin.email,
+                            stock_item.id,
+                        )
     except Exception:
-        logger.exception("Low stock notification block failed item_id=%s", stock_item.id)
+        logger.exception(
+            "Low stock notification block failed item_id=%s", stock_item.id
+        )
 
     return StockItemResponse.model_validate(stock_item)

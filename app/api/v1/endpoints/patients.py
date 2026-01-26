@@ -75,7 +75,9 @@ def _batch_visit_flags_for_page(
 
     # Eligible OPD definition aligned with your current UI logic:
     # status in (SCHEDULED, CHECKED_IN, IN_CONSULTATION) and scheduled_at >= start of today (UTC)
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
     eligible_statuses = (
         AppointmentStatus.SCHEDULED,
@@ -178,7 +180,9 @@ def quick_register_patient(
 
         logger = logging.getLogger(__name__)
         logger.error("Error creating patient: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create patient: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create patient: {str(e)}"
+        )
 
 
 @router.post(
@@ -248,7 +252,9 @@ def create_patient(
         national_id_number=payload.national_id_number,
         photo_path=payload.photo_path,
         consent_sms=payload.consent_sms if payload.consent_sms is not None else True,
-        consent_email=payload.consent_email if payload.consent_email is not None else True,
+        consent_email=payload.consent_email
+        if payload.consent_email is not None
+        else True,
         created_by_id=ctx.user.id,
         updated_by_id=ctx.user.id,
     )
@@ -261,7 +267,9 @@ def create_patient(
     ensure_search_path(db, ctx.tenant.schema_name)
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
-        raise HTTPException(status_code=500, detail="Failed to retrieve created patient")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve created patient"
+        )
 
     # Increment platform metrics (public schema)
     from app.services.tenant_metrics_service import increment_patients
@@ -282,19 +290,36 @@ def create_patient(
 
 @router.get("", response_model=dict)
 def list_patients(
-    search: Optional[str] = Query(None, description="Search by name, phone, patient_code, or national_id"),
-    department_id: Optional[UUID] = Query(None, description="Filter by department"),
-    doctor_user_id: Optional[UUID] = Query(None, description="Filter by doctor (via appointments)"),
-    patient_type: Optional[str] = Query(None, description="Filter by patient type (OPD/IPD)"),
-    visit_type: Optional[str] = Query(
-        None, description="Filter by visit type - patients with OPD appointments or IPD admissions"
+    search: Optional[str] = Query(
+        None, description="Search by name, phone, patient_code, or national_id"
     ),
-    date_from: Optional[date] = Query(None, description="Filter by last visit date from"),
+    department_id: Optional[UUID] = Query(None, description="Filter by department"),
+    doctor_user_id: Optional[UUID] = Query(
+        None, description="Filter by doctor (via appointments)"
+    ),
+    patient_type: Optional[str] = Query(
+        None, description="Filter by patient type (OPD/IPD)"
+    ),
+    visit_type: Optional[str] = Query(
+        None,
+        description="Filter by visit type - patients with OPD appointments or IPD admissions",
+    ),
+    date_from: Optional[date] = Query(
+        None, description="Filter by last visit date from"
+    ),
     date_to: Optional[date] = Query(None, description="Filter by last visit date to"),
-    registered_from: Optional[date] = Query(None, description="Filter by registration date from"),
-    registered_to: Optional[date] = Query(None, description="Filter by registration date to"),
-    gender: Optional[str] = Query(None, description="Filter by gender (MALE, FEMALE, OTHER, UNKNOWN)"),
-    include: Optional[str] = Query(None, description="Comma-separated includes. Supports: visit_flags"),
+    registered_from: Optional[date] = Query(
+        None, description="Filter by registration date from"
+    ),
+    registered_to: Optional[date] = Query(
+        None, description="Filter by registration date to"
+    ),
+    gender: Optional[str] = Query(
+        None, description="Filter by gender (MALE, FEMALE, OTHER, UNKNOWN)"
+    ),
+    include: Optional[str] = Query(
+        None, description="Comma-separated includes. Supports: visit_flags"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=500, description="Items per page"),
     db: Session = Depends(get_db),
@@ -314,7 +339,9 @@ def list_patients(
     query = db.query(Patient)
 
     # ABAC filters
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     user_department = ctx.user.department
     is_hospital_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
     is_receptionist = "RECEPTIONIST" in user_roles
@@ -326,10 +353,16 @@ def list_patients(
         from app.models.appointment import Appointment
 
         appointment_patient_ids = (
-            db.query(Appointment.patient_id).filter(Appointment.doctor_user_id == ctx.user.id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.doctor_user_id == ctx.user.id)
+            .distinct()
+            .subquery()
         )
         admission_patient_ids = (
-            db.query(Admission.patient_id).filter(Admission.primary_doctor_user_id == ctx.user.id).distinct().subquery()
+            db.query(Admission.patient_id)
+            .filter(Admission.primary_doctor_user_id == ctx.user.id)
+            .distinct()
+            .subquery()
         )
 
         query = query.filter(
@@ -340,7 +373,13 @@ def list_patients(
             )
         )
 
-    if is_nurse and user_department and not is_hospital_admin and not is_receptionist and not is_doctor:
+    if (
+        is_nurse
+        and user_department
+        and not is_hospital_admin
+        and not is_receptionist
+        and not is_doctor
+    ):
         from app.models.admission import Admission
         from app.models.appointment import Appointment
         from app.models.department import Department
@@ -348,10 +387,16 @@ def list_patients(
         dept = db.query(Department).filter(Department.name == user_department).first()
         if dept:
             appointment_patient_ids = (
-                db.query(Appointment.patient_id).filter(Appointment.department_id == dept.id).distinct().subquery()
+                db.query(Appointment.patient_id)
+                .filter(Appointment.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             admission_patient_ids = (
-                db.query(Admission.patient_id).filter(Admission.department_id == dept.id).distinct().subquery()
+                db.query(Admission.patient_id)
+                .filter(Admission.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             query = query.filter(
                 sa.or_(
@@ -388,10 +433,16 @@ def list_patients(
         from app.models.appointment import Appointment
 
         appointment_patient_ids = (
-            db.query(Appointment.patient_id).filter(Appointment.department_id == department_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         admission_patient_ids = (
-            db.query(Admission.patient_id).filter(Admission.department_id == department_id).distinct().subquery()
+            db.query(Admission.patient_id)
+            .filter(Admission.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         query = query.filter(
             sa.or_(
@@ -404,21 +455,33 @@ def list_patients(
         from app.models.appointment import Appointment
 
         patient_ids_with_appointments = (
-            db.query(Appointment.patient_id).filter(Appointment.doctor_user_id == doctor_user_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.doctor_user_id == doctor_user_id)
+            .distinct()
+            .subquery()
         )
-        query = query.filter(Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id)))
+        query = query.filter(
+            Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id))
+        )
 
     if patient_type:
         from app.models.admission import Admission, AdmissionStatus
 
         pt = patient_type.upper()
         active_admission_patient_ids = (
-            db.query(Admission.patient_id).filter(Admission.status == AdmissionStatus.ACTIVE).distinct().subquery()
+            db.query(Admission.patient_id)
+            .filter(Admission.status == AdmissionStatus.ACTIVE)
+            .distinct()
+            .subquery()
         )
         if pt == "IPD":
-            query = query.filter(Patient.id.in_(db.query(active_admission_patient_ids.c.patient_id)))
+            query = query.filter(
+                Patient.id.in_(db.query(active_admission_patient_ids.c.patient_id))
+            )
         elif pt == "OPD":
-            query = query.filter(~Patient.id.in_(db.query(active_admission_patient_ids.c.patient_id)))
+            query = query.filter(
+                ~Patient.id.in_(db.query(active_admission_patient_ids.c.patient_id))
+            )
 
     if visit_type:
         from app.models.admission import Admission
@@ -428,7 +491,9 @@ def list_patients(
 
         if vt in ("OPD", "OPD_ELIGIBLE"):
             if vt == "OPD_ELIGIBLE":
-                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                today_start = datetime.now(timezone.utc).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
                 appointment_patient_ids = (
                     db.query(Appointment.patient_id)
                     .filter(
@@ -445,12 +510,18 @@ def list_patients(
                     .subquery()
                 )
             else:
-                appointment_patient_ids = db.query(Appointment.patient_id).distinct().subquery()
-            query = query.filter(Patient.id.in_(db.query(appointment_patient_ids.c.patient_id)))
+                appointment_patient_ids = (
+                    db.query(Appointment.patient_id).distinct().subquery()
+                )
+            query = query.filter(
+                Patient.id.in_(db.query(appointment_patient_ids.c.patient_id))
+            )
 
         elif vt == "IPD":
             admission_patient_ids = db.query(Admission.patient_id).distinct().subquery()
-            query = query.filter(Patient.id.in_(db.query(admission_patient_ids.c.patient_id)))
+            query = query.filter(
+                Patient.id.in_(db.query(admission_patient_ids.c.patient_id))
+            )
 
     if date_from or date_to:
         # last_visited_at must be present when filtering by last visit date
@@ -483,7 +554,9 @@ def list_patients(
         # Always compute active admissions for patient_type (single query), regardless of include.
         # If include=visit_flags, also compute next eligible OPD (single query).
         if "visit_flags" in includes:
-            active_patient_ids, next_opd_by_patient_id = _batch_visit_flags_for_page(db, patient_ids)
+            active_patient_ids, next_opd_by_patient_id = _batch_visit_flags_for_page(
+                db, patient_ids
+            )
         else:
             # only active admission IDs needed for patient_type
             from app.models.admission import Admission, AdmissionStatus
@@ -504,7 +577,9 @@ def list_patients(
         patient_dict = PatientResponse.model_validate(p).model_dump()
 
         has_active_admission = p.id in active_patient_ids
-        patient_dict["patient_type"] = PatientType.IPD if has_active_admission else PatientType.OPD
+        patient_dict["patient_type"] = (
+            PatientType.IPD if has_active_admission else PatientType.OPD
+        )
 
         if "visit_flags" in includes:
             patient_dict["has_active_admission"] = has_active_admission
@@ -530,13 +605,21 @@ def check_duplicate_patients(
     dob: Optional[date] = Query(None, description="Date of birth"),
     phone_primary: str = Query(..., min_length=1, description="Primary phone"),
     national_id_number: Optional[str] = Query(None, description="National ID number"),
-    exclude_patient_id: Optional[UUID] = Query(None, description="Exclude this patient ID"),
+    exclude_patient_id: Optional[UUID] = Query(
+        None, description="Exclude this patient ID"
+    ),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> DuplicateCheckResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
 
-    normalized_phone = phone_primary.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").strip()
+    normalized_phone = (
+        phone_primary.replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+        .strip()
+    )
     if not normalized_phone:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -566,7 +649,9 @@ def get_patient(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_hospital_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
     is_doctor = "DOCTOR" in user_roles
     is_receptionist = "RECEPTIONIST" in user_roles
@@ -660,7 +745,9 @@ def update_patient_profile(
         )
 
         patient_dict = PatientResponse.model_validate(updated_patient).model_dump()
-        patient_dict["patient_type"] = PatientType.IPD if has_active else PatientType.OPD
+        patient_dict["patient_type"] = (
+            PatientType.IPD if has_active else PatientType.OPD
+        )
         return PatientResponse(**patient_dict)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -702,7 +789,9 @@ def update_patient(
         )
 
         patient_dict = PatientResponse.model_validate(updated_patient).model_dump()
-        patient_dict["patient_type"] = PatientType.IPD if has_active else PatientType.OPD
+        patient_dict["patient_type"] = (
+            PatientType.IPD if has_active else PatientType.OPD
+        )
         return PatientResponse(**patient_dict)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -772,7 +861,9 @@ async def upload_patient_profile_picture(
 
         patient = db.query(Patient).filter(Patient.id == patient_id).first()
         if not patient:
-            raise HTTPException(status_code=500, detail="Failed to retrieve updated patient")
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve updated patient"
+            )
 
         from app.models.admission import Admission, AdmissionStatus
 
@@ -787,7 +878,9 @@ async def upload_patient_profile_picture(
         )
 
         patient_dict = PatientResponse.model_validate(patient).model_dump()
-        patient_dict["patient_type"] = PatientType.IPD if has_active else PatientType.OPD
+        patient_dict["patient_type"] = (
+            PatientType.IPD if has_active else PatientType.OPD
+        )
         return PatientResponse(**patient_dict)
     except Exception as e:
         db.rollback()
@@ -862,7 +955,12 @@ def get_patient_clinical_snapshot(
     from app.models.department import Department
     from app.models.vital import Vital
 
-    latest_vital = db.query(Vital).filter(Vital.patient_id == patient_id).order_by(Vital.recorded_at.desc()).first()
+    latest_vital = (
+        db.query(Vital)
+        .filter(Vital.patient_id == patient_id)
+        .order_by(Vital.recorded_at.desc())
+        .first()
+    )
 
     active_admission = (
         db.query(Admission)
@@ -876,7 +974,11 @@ def get_patient_clinical_snapshot(
 
     active_admission_dept_name = None
     if active_admission and active_admission.department_id:
-        dept = db.query(Department).filter(Department.id == active_admission.department_id).first()
+        dept = (
+            db.query(Department)
+            .filter(Department.id == active_admission.department_id)
+            .first()
+        )
         active_admission_dept_name = dept.name if dept else None
 
     now = datetime.now(timezone.utc)
@@ -894,7 +996,11 @@ def get_patient_clinical_snapshot(
 
     next_appointment_dept_name = None
     if next_appointment and next_appointment.department_id:
-        dept = db.query(Department).filter(Department.id == next_appointment.department_id).first()
+        dept = (
+            db.query(Department)
+            .filter(Department.id == next_appointment.department_id)
+            .first()
+        )
         next_appointment_dept_name = dept.name if dept else None
 
     return {
@@ -902,7 +1008,9 @@ def get_patient_clinical_snapshot(
         "allergies": patient.known_allergies,
         "chronic_conditions": patient.chronic_conditions,
         "latest_vital": {
-            "recorded_at": latest_vital.recorded_at.isoformat() if latest_vital else None,
+            "recorded_at": latest_vital.recorded_at.isoformat()
+            if latest_vital
+            else None,
             "systolic_bp": latest_vital.systolic_bp if latest_vital else None,
             "diastolic_bp": latest_vital.diastolic_bp if latest_vital else None,
             "heart_rate": latest_vital.heart_rate if latest_vital else None,

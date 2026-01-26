@@ -66,9 +66,15 @@ class StockItem(Base):
     # Item Information
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     generic_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    form: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. Tablet, Syrup
-    strength: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. 500 mg
-    route: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. oral, IV
+    form: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # e.g. Tablet, Syrup
+    strength: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # e.g. 500 mg
+    route: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # e.g. oral, IV
 
     # Default Prescription Values
     default_dosage: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -117,7 +123,9 @@ class StockItem(Base):
     __table_args__ = (
         # Unique constraint: (type, name, form, strength) per tenant
         # Note: Since this is tenant-scoped, uniqueness is enforced within tenant schema
-        UniqueConstraint("type", "name", "form", "strength", name="uq_stock_item_tenant"),
+        UniqueConstraint(
+            "type", "name", "form", "strength", name="uq_stock_item_tenant"
+        ),
         # Index for filtering by type and active status (used in autocomplete)
         Index("idx_stock_item_type_active", "type", "is_active"),
     )

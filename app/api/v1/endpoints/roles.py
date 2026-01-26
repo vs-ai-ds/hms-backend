@@ -171,18 +171,30 @@ def create_role(
         )
 
     # If template_role_id is provided, copy permissions from that role
-    permission_codes = list(payload.permission_codes) if payload.permission_codes else []
+    permission_codes = (
+        list(payload.permission_codes) if payload.permission_codes else []
+    )
     if payload.template_role_id:
-        template_role = db.query(TenantRole).filter(TenantRole.id == payload.template_role_id).first()
+        template_role = (
+            db.query(TenantRole)
+            .filter(TenantRole.id == payload.template_role_id)
+            .first()
+        )
         if not template_role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template role not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Template role not found."
+            )
 
-        template_codes = [rp.permission_code for rp in (template_role.permissions or [])]
+        template_codes = [
+            rp.permission_code for rp in (template_role.permissions or [])
+        ]
         permission_codes = template_codes
 
         # Merge with any additional permissions provided
         if payload.permission_codes:
-            permission_codes = list(set(permission_codes + list(payload.permission_codes)))
+            permission_codes = list(
+                set(permission_codes + list(payload.permission_codes))
+            )
 
     # Validate permission codes exist in public.permission_definitions
     _validate_permission_codes(db, permission_codes)
@@ -208,7 +220,9 @@ def create_role(
     # Reload with joined permissions to build response reliably
     role = db.query(TenantRole).filter(TenantRole.id == role.id).first()
     if not role:
-        raise HTTPException(status_code=500, detail="Role created but could not be reloaded.")
+        raise HTTPException(
+            status_code=500, detail="Role created but could not be reloaded."
+        )
 
     return _role_to_response(db, role)
 
@@ -245,7 +259,11 @@ def update_role(
         )
 
     if payload.name and payload.name != role.name:
-        existing = db.query(TenantRole).filter(TenantRole.name == payload.name, TenantRole.id != role_id).first()
+        existing = (
+            db.query(TenantRole)
+            .filter(TenantRole.name == payload.name, TenantRole.id != role_id)
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -262,7 +280,9 @@ def update_role(
         _validate_permission_codes(db, new_codes)
 
         # Delete existing permissions
-        db.query(TenantRolePermission).filter(TenantRolePermission.role_id == role.id).delete()
+        db.query(TenantRolePermission).filter(
+            TenantRolePermission.role_id == role.id
+        ).delete()
 
         # Add new permissions
         for code in new_codes:
@@ -274,7 +294,9 @@ def update_role(
 
     role = db.query(TenantRole).filter(TenantRole.id == role_id).first()
     if not role:
-        raise HTTPException(status_code=500, detail="Role updated but could not be reloaded.")
+        raise HTTPException(
+            status_code=500, detail="Role updated but could not be reloaded."
+        )
 
     return _role_to_response(db, role)
 
@@ -331,7 +353,10 @@ def list_available_permissions(
         .all()
     )
 
-    return [{"code": r["code"], "name": r["description"], "category": r["category"]} for r in rows]
+    return [
+        {"code": r["code"], "name": r["description"], "category": r["category"]}
+        for r in rows
+    ]
 
 
 @router.patch(
@@ -368,7 +393,9 @@ def toggle_role_active(
 
     role = db.query(TenantRole).filter(TenantRole.id == role_id).first()
     if not role:
-        raise HTTPException(status_code=500, detail="Role updated but could not be reloaded.")
+        raise HTTPException(
+            status_code=500, detail="Role updated but could not be reloaded."
+        )
 
     return _role_to_response(db, role)
 
@@ -401,7 +428,9 @@ def delete_role(
             detail="Cannot delete system roles. System roles are locked and cannot be removed. To customize, create a new role based on this template.",
         )
 
-    user_count = db.query(TenantUserRole).filter(TenantUserRole.role_id == role_id).count()
+    user_count = (
+        db.query(TenantUserRole).filter(TenantUserRole.role_id == role_id).count()
+    )
     if user_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

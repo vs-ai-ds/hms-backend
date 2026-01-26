@@ -18,7 +18,7 @@ Examples:
   python -m scripts.setup_platform --ensure-super-admin --email admin@platform.local --password "Admin@12345"
 
   # Ensure both (metrics first)
-  python -m scripts.setup_platform --init-metrics --ensure-super-admin --email admin@platform.local 
+  python -m scripts.setup_platform --init-metrics --ensure-super-admin --email admin@platform.local
   --password "Admin@12345"
 
 Examples - env-driven:
@@ -51,7 +51,9 @@ def ensure_tenant_metrics_row(db: Session) -> None:
     Ensure the singleton TenantMetrics row exists.
     Safe to run on every deploy.
     """
-    existing = db.query(TenantMetrics).filter(TenantMetrics.id == TENANT_METRICS_ID).first()
+    existing = (
+        db.query(TenantMetrics).filter(TenantMetrics.id == TENANT_METRICS_ID).first()
+    )
     if existing:
         print("tenant_metrics row exists")
         return
@@ -77,7 +79,9 @@ def ensure_super_admin(
     - If user exists: update fields to be login-ready + refresh password if provided.
     - If missing: create it.
     """
-    existing = db.query(User).filter(User.tenant_id.is_(None), User.email == email).first()
+    existing = (
+        db.query(User).filter(User.tenant_id.is_(None), User.email == email).first()
+    )
 
     hashed = get_password_hash(password)
 
@@ -120,7 +124,9 @@ def ensure_super_admin(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="HMS platform setup (public schema)")
-    p.add_argument("--init-metrics", action="store_true", help="Ensure tenant_metrics row exists")
+    p.add_argument(
+        "--init-metrics", action="store_true", help="Ensure tenant_metrics row exists"
+    )
     p.add_argument(
         "--ensure-super-admin",
         action="store_true",
@@ -128,10 +134,26 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Optional CLI overrides (otherwise env is used)
-    p.add_argument("--email", type=str, help="SUPER_ADMIN email (or use env SUPER_ADMIN_EMAIL)")
-    p.add_argument("--password", type=str, help="SUPER_ADMIN password (or use env SUPER_ADMIN_PASSWORD)")
-    p.add_argument("--first-name", type=str, default=None, help="Default: env SUPER_ADMIN_FIRST_NAME or 'Super'")
-    p.add_argument("--last-name", type=str, default=None, help="Default: env SUPER_ADMIN_LAST_NAME or 'Admin'")
+    p.add_argument(
+        "--email", type=str, help="SUPER_ADMIN email (or use env SUPER_ADMIN_EMAIL)"
+    )
+    p.add_argument(
+        "--password",
+        type=str,
+        help="SUPER_ADMIN password (or use env SUPER_ADMIN_PASSWORD)",
+    )
+    p.add_argument(
+        "--first-name",
+        type=str,
+        default=None,
+        help="Default: env SUPER_ADMIN_FIRST_NAME or 'Super'",
+    )
+    p.add_argument(
+        "--last-name",
+        type=str,
+        default=None,
+        help="Default: env SUPER_ADMIN_LAST_NAME or 'Admin'",
+    )
     return p.parse_args()
 
 

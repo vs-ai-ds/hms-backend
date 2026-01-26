@@ -32,9 +32,13 @@ class PermissionDefinition(Base):
     )
 
     # Permission Information
-    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    category: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g., "dashboard", "patients"
+    category: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # e.g., "dashboard", "patients"
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

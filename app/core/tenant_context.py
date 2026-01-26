@@ -52,7 +52,9 @@ def get_tenant_context(
             detail="Tenant-scoped operation requires a tenant user.",
         )
 
-    tenant = db.query(Tenant).filter(Tenant.id == UUID(str(current_user.tenant_id))).first()
+    tenant = (
+        db.query(Tenant).filter(Tenant.id == UUID(str(current_user.tenant_id))).first()
+    )
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -96,7 +98,10 @@ def get_tenant_context(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(f"Could not ensure tenant tables exist for schema {tenant.schema_name}: {e}", exc_info=True)
+        logger.error(
+            f"Could not ensure tenant tables exist for schema {tenant.schema_name}: {e}",
+            exc_info=True,
+        )
         # Don't fail the request, but log the error - tables should be created on next request
 
     _set_tenant_search_path(db, tenant.schema_name)

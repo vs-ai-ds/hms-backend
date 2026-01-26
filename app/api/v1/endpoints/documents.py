@@ -41,7 +41,9 @@ router = APIRouter()
 async def upload_documents(
     patient_id: UUID = Query(..., description="ID of the patient"),
     files: list[UploadFile] = File(...),
-    document_types: list[str] = Query(default=[], description="Document types for each file (same order as files)"),
+    document_types: list[str] = Query(
+        default=[], description="Document types for each file (same order as files)"
+    ),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[DocumentResponse]:

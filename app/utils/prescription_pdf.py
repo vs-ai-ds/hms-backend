@@ -140,10 +140,16 @@ def generate_prescription_pdf(
     if prescription_date:
         if isinstance(prescription_date, str):
             try:
-                date_obj = datetime.fromisoformat(prescription_date.replace("Z", "+00:00"))
+                date_obj = datetime.fromisoformat(
+                    prescription_date.replace("Z", "+00:00")
+                )
                 date_str = date_obj.strftime("%d/%m/%Y")
             except:
-                date_str = prescription_date[:10] if len(prescription_date) >= 10 else prescription_date
+                date_str = (
+                    prescription_date[:10]
+                    if len(prescription_date) >= 10
+                    else prescription_date
+                )
         else:
             date_str = prescription_date.strftime("%d/%m/%Y")
         elements.append(Paragraph(f"Date: {date_str}", normal_style))
@@ -168,7 +174,9 @@ def generate_prescription_pdf(
         elements.append(Spacer(1, 2 * mm))
 
         # Table header
-        medicine_data = [["Medicine", "Dosage", "Frequency", "Duration", "Instructions"]]
+        medicine_data = [
+            ["Medicine", "Dosage", "Frequency", "Duration", "Instructions"]
+        ]
 
         for item in items:
             medicine_name = item.get("medicine_name", "N/A")
@@ -187,7 +195,9 @@ def generate_prescription_pdf(
                 ]
             )
 
-        medicine_table = Table(medicine_data, colWidths=[60 * mm, 30 * mm, 30 * mm, 30 * mm, 40 * mm])
+        medicine_table = Table(
+            medicine_data, colWidths=[60 * mm, 30 * mm, 30 * mm, 30 * mm, 40 * mm]
+        )
         medicine_table.setStyle(
             TableStyle(
                 [

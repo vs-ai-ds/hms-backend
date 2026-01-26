@@ -163,18 +163,26 @@ def seed_permission_definitions(db: Session) -> dict[str, PermissionDefinition]:
     """
     permissions_map = {}
     for code, description, category in DEFAULT_PERMISSIONS:
-        existing = db.query(PermissionDefinition).filter(PermissionDefinition.code == code).first()
+        existing = (
+            db.query(PermissionDefinition)
+            .filter(PermissionDefinition.code == code)
+            .first()
+        )
         if existing:
             permissions_map[code] = existing
         else:
-            perm = PermissionDefinition(code=code, description=description, category=category)
+            perm = PermissionDefinition(
+                code=code, description=description, category=category
+            )
             db.add(perm)
             permissions_map[code] = perm
     db.flush()
     return permissions_map
 
 
-def seed_tenant_roles(db: Session, role_permissions_map: dict[RoleName, list[str]]) -> dict[RoleName, TenantRole]:
+def seed_tenant_roles(
+    db: Session, role_permissions_map: dict[RoleName, list[str]]
+) -> dict[RoleName, TenantRole]:
     """
     Seed default roles in tenant schema and assign permissions.
     Must be called with tenant schema search_path already set.
@@ -188,7 +196,9 @@ def seed_tenant_roles(db: Session, role_permissions_map: dict[RoleName, list[str
         RoleName.PHARMACIST,
         RoleName.RECEPTIONIST,
     ]:
-        existing = db.query(TenantRole).filter(TenantRole.name == role_name.value).first()
+        existing = (
+            db.query(TenantRole).filter(TenantRole.name == role_name.value).first()
+        )
         if existing:
             role = existing
         else:
@@ -204,7 +214,9 @@ def seed_tenant_roles(db: Session, role_permissions_map: dict[RoleName, list[str
 
         # Clear existing permissions and assign new ones
         # Delete existing role permissions
-        db.query(TenantRolePermission).filter(TenantRolePermission.role_id == role.id).delete()
+        db.query(TenantRolePermission).filter(
+            TenantRolePermission.role_id == role.id
+        ).delete()
         db.flush()
 
         # Assign permissions to role
@@ -323,7 +335,10 @@ def update_doctor_role_permissions_for_all_tenants(db: Session) -> dict:
                 # Find DOCTOR role
                 doctor_role = (
                     db.query(TenantRole)
-                    .filter(TenantRole.name == RoleName.DOCTOR.value, TenantRole.system_key == RoleName.DOCTOR.value)
+                    .filter(
+                        TenantRole.name == RoleName.DOCTOR.value,
+                        TenantRole.system_key == RoleName.DOCTOR.value,
+                    )
                     .first()
                 )
 
@@ -367,7 +382,9 @@ def update_doctor_role_permissions_for_all_tenants(db: Session) -> dict:
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.error(f"Failed to update DOCTOR role for tenant {tenant.name}: {e}")
+                logger.error(
+                    f"Failed to update DOCTOR role for tenant {tenant.name}: {e}"
+                )
                 # Try to reset search_path even after error
                 try:
                     db.execute(text(f"SET search_path TO {original_path}"))

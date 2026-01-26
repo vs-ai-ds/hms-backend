@@ -42,12 +42,18 @@ def export_patients_csv(
     query = db.query(Patient)
 
     # Apply ABAC filters
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     user_department = ctx.user.department
     is_hospital_admin = "HOSPITAL_ADMIN" in user_roles
 
     # ABAC: Filter by department via appointments/admissions (department is per-visit, not per-patient)
-    if user_department and not is_hospital_admin and ("DOCTOR" in user_roles or "NURSE" in user_roles):
+    if (
+        user_department
+        and not is_hospital_admin
+        and ("DOCTOR" in user_roles or "NURSE" in user_roles)
+    ):
         from sqlalchemy import or_ as sa_or_
 
         from app.models.admission import Admission
@@ -58,10 +64,16 @@ def export_patients_csv(
         if dept:
             # Filter patients with appointments or admissions in this department
             appointment_patient_ids = (
-                db.query(Appointment.patient_id).filter(Appointment.department_id == dept.id).distinct().subquery()
+                db.query(Appointment.patient_id)
+                .filter(Appointment.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             admission_patient_ids = (
-                db.query(Admission.patient_id).filter(Admission.department_id == dept.id).distinct().subquery()
+                db.query(Admission.patient_id)
+                .filter(Admission.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             query = query.filter(
                 sa_or_(
@@ -92,10 +104,16 @@ def export_patients_csv(
         from app.models.appointment import Appointment
 
         appointment_patient_ids = (
-            db.query(Appointment.patient_id).filter(Appointment.department_id == department_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         admission_patient_ids = (
-            db.query(Admission.patient_id).filter(Admission.department_id == department_id).distinct().subquery()
+            db.query(Admission.patient_id)
+            .filter(Admission.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         query = query.filter(
             sa_or_(
@@ -107,9 +125,14 @@ def export_patients_csv(
         from app.models.appointment import Appointment
 
         patient_ids_with_appointments = (
-            db.query(Appointment.patient_id).filter(Appointment.doctor_user_id == doctor_user_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.doctor_user_id == doctor_user_id)
+            .distinct()
+            .subquery()
         )
-        query = query.filter(Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id)))
+        query = query.filter(
+            Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id))
+        )
     if patient_type:
         query = query.filter(Patient.patient_type == patient_type)
     if date_from:
@@ -178,7 +201,11 @@ def export_patients_csv(
             if upcoming_appt and upcoming_appt.doctor
             else ""
         )
-        upcoming_dept = upcoming_appt.department.name if upcoming_appt and upcoming_appt.department else ""
+        upcoming_dept = (
+            upcoming_appt.department.name
+            if upcoming_appt and upcoming_appt.department
+            else ""
+        )
 
         writer.writerow(
             [
@@ -204,7 +231,9 @@ def export_patients_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=patients_{ctx.tenant.name.replace(' ', '_')}.csv"},
+        headers={
+            "Content-Disposition": f"attachment; filename=patients_{ctx.tenant.name.replace(' ', '_')}.csv"
+        },
     )
 
 
@@ -227,12 +256,18 @@ def export_patients_pdf(
     query = db.query(Patient)
 
     # Apply ABAC filters
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     user_department = ctx.user.department
     is_hospital_admin = "HOSPITAL_ADMIN" in user_roles
 
     # ABAC: Filter by department via appointments/admissions (department is per-visit, not per-patient)
-    if user_department and not is_hospital_admin and ("DOCTOR" in user_roles or "NURSE" in user_roles):
+    if (
+        user_department
+        and not is_hospital_admin
+        and ("DOCTOR" in user_roles or "NURSE" in user_roles)
+    ):
         from sqlalchemy import or_ as sa_or_
 
         from app.models.admission import Admission
@@ -243,10 +278,16 @@ def export_patients_pdf(
         if dept:
             # Filter patients with appointments or admissions in this department
             appointment_patient_ids = (
-                db.query(Appointment.patient_id).filter(Appointment.department_id == dept.id).distinct().subquery()
+                db.query(Appointment.patient_id)
+                .filter(Appointment.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             admission_patient_ids = (
-                db.query(Admission.patient_id).filter(Admission.department_id == dept.id).distinct().subquery()
+                db.query(Admission.patient_id)
+                .filter(Admission.department_id == dept.id)
+                .distinct()
+                .subquery()
             )
             query = query.filter(
                 sa_or_(
@@ -275,10 +316,16 @@ def export_patients_pdf(
         from app.models.appointment import Appointment
 
         appointment_patient_ids = (
-            db.query(Appointment.patient_id).filter(Appointment.department_id == department_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         admission_patient_ids = (
-            db.query(Admission.patient_id).filter(Admission.department_id == department_id).distinct().subquery()
+            db.query(Admission.patient_id)
+            .filter(Admission.department_id == department_id)
+            .distinct()
+            .subquery()
         )
         query = query.filter(
             sa_or_(
@@ -290,9 +337,14 @@ def export_patients_pdf(
         from app.models.appointment import Appointment
 
         patient_ids_with_appointments = (
-            db.query(Appointment.patient_id).filter(Appointment.doctor_user_id == doctor_user_id).distinct().subquery()
+            db.query(Appointment.patient_id)
+            .filter(Appointment.doctor_user_id == doctor_user_id)
+            .distinct()
+            .subquery()
         )
-        query = query.filter(Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id)))
+        query = query.filter(
+            Patient.id.in_(db.query(patient_ids_with_appointments.c.patient_id))
+        )
     if patient_type:
         query = query.filter(Patient.patient_type == patient_type)
     if visit_type:
@@ -301,11 +353,17 @@ def export_patients_pdf(
         from app.models.appointment import Appointment
 
         if visit_type.upper() == "OPD":
-            appointment_patient_ids = db.query(Appointment.patient_id).distinct().subquery()
-            query = query.filter(Patient.id.in_(db.query(appointment_patient_ids.c.patient_id)))
+            appointment_patient_ids = (
+                db.query(Appointment.patient_id).distinct().subquery()
+            )
+            query = query.filter(
+                Patient.id.in_(db.query(appointment_patient_ids.c.patient_id))
+            )
         elif visit_type.upper() == "IPD":
             admission_patient_ids = db.query(Admission.patient_id).distinct().subquery()
-            query = query.filter(Patient.id.in_(db.query(admission_patient_ids.c.patient_id)))
+            query = query.filter(
+                Patient.id.in_(db.query(admission_patient_ids.c.patient_id))
+            )
     if date_from:
         query = query.filter(func.date(Patient.last_visited_at) >= date_from)
     if date_to:
@@ -361,7 +419,9 @@ def export_patients_pdf(
         )
 
         upcoming_str = (
-            upcoming_appt.scheduled_at.strftime("%Y-%m-%d") if upcoming_appt and upcoming_appt.scheduled_at else ""
+            upcoming_appt.scheduled_at.strftime("%Y-%m-%d")
+            if upcoming_appt and upcoming_appt.scheduled_at
+            else ""
         )
 
         name = f"{patient.first_name} {patient.last_name or ''}".strip()
@@ -377,7 +437,9 @@ def export_patients_pdf(
         )
 
     # Create table - adjust column widths for new columns
-    table = Table(data, colWidths=[1 * inch, 2 * inch, 1 * inch, 0.7 * inch, 1 * inch, 0.8 * inch])
+    table = Table(
+        data, colWidths=[1 * inch, 2 * inch, 1 * inch, 0.7 * inch, 1 * inch, 0.8 * inch]
+    )
     table.setStyle(
         TableStyle(
             [
@@ -402,5 +464,7 @@ def export_patients_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=patients_{ctx.tenant.name.replace(' ', '_')}.pdf"},
+        headers={
+            "Content-Disposition": f"attachment; filename=patients_{ctx.tenant.name.replace(' ', '_')}.pdf"
+        },
     )

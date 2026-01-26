@@ -76,7 +76,9 @@ class Patient(Base):
     first_name: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     middle_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)  # MALE/FEMALE/OTHER/UNKNOWN
+    gender: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # MALE/FEMALE/OTHER/UNKNOWN
 
     # Date of Birth
     dob: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
@@ -84,7 +86,9 @@ class Patient(Base):
     age_only: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Contact Information
-    phone_primary: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    phone_primary: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True
+    )
     phone_alternate: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(254), nullable=True)
 
@@ -97,9 +101,15 @@ class Patient(Base):
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Emergency Contact
-    emergency_contact_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    emergency_contact_relation: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    emergency_contact_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    emergency_contact_name: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    emergency_contact_relation: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
+    emergency_contact_phone: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
 
     # Medical Information
     blood_group: Mapped[str | None] = mapped_column(String(10), nullable=True)
@@ -111,7 +121,9 @@ class Patient(Base):
 
     # National ID
     national_id_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    national_id_number: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    national_id_number: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, index=True
+    )
 
     # Photo
     photo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -129,7 +141,9 @@ class Patient(Base):
     date_of_death: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Timestamps
-    last_visited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_visited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

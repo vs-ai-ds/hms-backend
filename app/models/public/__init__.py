@@ -6,5 +6,10 @@ from app.models.tenant_metrics import TenantMetrics
 from app.models.permission_definition import PermissionDefinition
 from app.models.email_log import EmailLog
 from app.models.password_history import PasswordHistory
-from app.models.patient_share import PatientShare, PatientShareLink, PatientShareAccessLog
+from app.models.patient_share import (
+    PatientShare,
+    PatientShareLink,
+    PatientShareAccessLog,
+)
 from app.models.sharing import SharingRequest
+from app.models.background_task import BackgroundTask

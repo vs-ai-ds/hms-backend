@@ -12,7 +12,9 @@ class RoleBase(BaseModel):
 
 class RoleCreate(RoleBase):
     permission_codes: list[str] = []
-    template_role_id: UUID | None = None  # Optional: create role based on existing role template
+    template_role_id: UUID | None = (
+        None  # Optional: create role based on existing role template
+    )
 
 
 class RoleUpdate(BaseModel):

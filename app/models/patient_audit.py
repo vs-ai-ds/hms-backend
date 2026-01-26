@@ -52,8 +52,12 @@ class PatientAuditLog(Base):
     change_reason: Mapped[str | None] = mapped_column(
         String(500), nullable=True, doc="Reason for change (user-provided)"
     )
-    old_values: Mapped[str | None] = mapped_column(Text, nullable=True, doc="JSON snapshot of old values")
-    new_values: Mapped[str | None] = mapped_column(Text, nullable=True, doc="JSON snapshot of new values")
+    old_values: Mapped[str | None] = mapped_column(
+        Text, nullable=True, doc="JSON snapshot of old values"
+    )
+    new_values: Mapped[str | None] = mapped_column(
+        Text, nullable=True, doc="JSON snapshot of new values"
+    )
     metadata_json: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,

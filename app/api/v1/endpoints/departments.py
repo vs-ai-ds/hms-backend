@@ -10,7 +10,11 @@ from app.core.tenant_db import ensure_search_path
 from app.dependencies.authz import require_permission
 from app.models.department import Department
 from app.models.user import User
-from app.schemas.department import DepartmentCreate, DepartmentResponse, DepartmentUpdate
+from app.schemas.department import (
+    DepartmentCreate,
+    DepartmentResponse,
+    DepartmentUpdate,
+)
 
 router = APIRouter()
 
@@ -47,7 +51,9 @@ def list_departments(
         try:
             dept_dict = DepartmentResponse.model_validate(d).model_dump()
             # Count users assigned to this department
-            user_count = db.query(UserModel).filter(UserModel.department == d.name).count()
+            user_count = (
+                db.query(UserModel).filter(UserModel.department == d.name).count()
+            )
             # Count patients with appointments or admissions in this department
             # (Department is per-visit, not per-patient)
             from app.models.admission import Admission
@@ -78,7 +84,9 @@ def list_departments(
             patient_count = len(all_patient_ids)
             dept_dict["user_count"] = user_count
             dept_dict["patient_count"] = patient_count
-            dept_dict["is_system"] = d.name == "Administrator"  # Mark Administrator as system department
+            dept_dict["is_system"] = (
+                d.name == "Administrator"
+            )  # Mark Administrator as system department
             result.append(dept_dict)
         except Exception as e:
             # Skip departments with invalid data (e.g., whitespace-only names)
@@ -189,7 +197,9 @@ def update_department(
     ensure_search_path(db, ctx.tenant.schema_name)
 
     # Re-query to ensure we get the department with all fields (created_at, updated_at)
-    updated_department = db.query(Department).filter(Department.id == department_id).first()
+    updated_department = (
+        db.query(Department).filter(Department.id == department_id).first()
+    )
     if not updated_department:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -241,8 +251,12 @@ def delete_department(
     from app.models.admission import Admission
     from app.models.appointment import Appointment
 
-    appointment_count = db.query(Appointment).filter(Appointment.department_id == department_id).count()
-    admission_count = db.query(Admission).filter(Admission.department_id == department_id).count()
+    appointment_count = (
+        db.query(Appointment).filter(Appointment.department_id == department_id).count()
+    )
+    admission_count = (
+        db.query(Admission).filter(Admission.department_id == department_id).count()
+    )
     if appointment_count > 0 or admission_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

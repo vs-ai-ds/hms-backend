@@ -42,9 +42,7 @@ class Settings(BaseSettings):
 
     # Patient notification flags
     send_email_to_patients: bool = False  # Set to True to send emails to patients
-    send_sms_to_patients: bool = (
-        False  # Set to True to send SMS to patients (requires SMS_ENABLED=True and SMS provider configured)
-    )
+    send_sms_to_patients: bool = False  # Set to True to send SMS to patients (requires SMS_ENABLED=True and SMS provider configured)
 
     # SMS provider configuration (for Twilio or other providers)
     sms_provider_account_sid: str | None = None  # Twilio Account SID
@@ -64,8 +62,12 @@ class Settings(BaseSettings):
     # OPD Appointment lifecycle configuration
     opd_no_show_minutes_after_scheduled: int = 180  # 3 hours default
     opd_checkin_grace_minutes: int = 30  # 30 minutes grace period for check-in
-    opd_rx_create_window_hours_past: int = 2  # Can create Rx for appointments up to 2 hours in past
-    opd_rx_create_window_hours_future: int = 24  # Can create Rx for appointments up to 24 hours in future
+    opd_rx_create_window_hours_past: int = (
+        2  # Can create Rx for appointments up to 2 hours in past
+    )
+    opd_rx_create_window_hours_future: int = (
+        24  # Can create Rx for appointments up to 24 hours in future
+    )
 
     # Date format configuration
     # Options: "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD", "DD-MM-YYYY"
@@ -76,8 +78,12 @@ class Settings(BaseSettings):
 
     # Demo mode
     demo_mode: bool = False  # Enable demo mode features (demo refresh endpoint, etc.)
-    demo_auto_refresh_on_login: bool = False  # Auto-freshen demo data on login (DEMO only)
-    demo_refresh_ttl_hours: int = 24  # TTL in hours for auto-refresh check (default 24h)
+    demo_auto_refresh_on_login: bool = (
+        False  # Auto-freshen demo data on login (DEMO only)
+    )
+    demo_refresh_ttl_hours: int = (
+        24  # TTL in hours for auto-refresh check (default 24h)
+    )
     demo_freshen_days: int = 7  # Default days to shift forward for freshen (default 7)
 
     # Web Push (VAPID)
@@ -125,11 +131,15 @@ def get_settings() -> Settings:
     try:
         settings = Settings()
     except Exception as e:
-        raise ValueError(f"Failed to load settings. Please check your .env file. Error: {e}") from e
+        raise ValueError(
+            f"Failed to load settings. Please check your .env file. Error: {e}"
+        ) from e
 
     # Handle schema name max attempts alias (backward compatibility)
     if settings.hms_schema_name_max_attempts is not None:
-        settings.hms_tenant_schema_name_max_attempts = settings.hms_schema_name_max_attempts
+        settings.hms_tenant_schema_name_max_attempts = (
+            settings.hms_schema_name_max_attempts
+        )
 
     # Validate critical settings
     if not settings.database_url:
@@ -138,15 +148,21 @@ def get_settings() -> Settings:
     if settings.secret_key == "changeme":
         import warnings
 
-        warnings.warn("SECRET_KEY is set to default 'changeme'. Please change it in production!", UserWarning)
+        warnings.warn(
+            "SECRET_KEY is set to default 'changeme'. Please change it in production!",
+            UserWarning,
+        )
 
     # Validate email settings based on backend
     if settings.email_backend == "resend" and not settings.resend_api_key:
-        raise ValueError("RESEND_API_KEY is required when EMAIL_BACKEND=resend but not set in .env file")
+        raise ValueError(
+            "RESEND_API_KEY is required when EMAIL_BACKEND=resend but not set in .env file"
+        )
 
     if settings.email_backend == "smtp":
         if not settings.email_smtp_host:
-            raise ValueError("EMAIL_SMTP_HOST is required when EMAIL_BACKEND=smtp but not set in .env file")
+            raise ValueError(
+                "EMAIL_SMTP_HOST is required when EMAIL_BACKEND=smtp but not set in .env file"
+            )
 
     return settings
-

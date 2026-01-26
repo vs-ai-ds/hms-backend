@@ -87,8 +87,14 @@ def _build_user_response_with_roles(
         for user_role in user_roles:
             role = user_role.role
             # Get permissions for this role
-            role_permissions = db.query(TenantRolePermission).filter(TenantRolePermission.role_id == role.id).all()
-            permissions = [PermissionResponse(code=rp.permission_code) for rp in role_permissions]
+            role_permissions = (
+                db.query(TenantRolePermission)
+                .filter(TenantRolePermission.role_id == role.id)
+                .all()
+            )
+            permissions = [
+                PermissionResponse(code=rp.permission_code) for rp in role_permissions
+            ]
             role_responses.append(RoleResponse(name=role.name, permissions=permissions))
     except Exception as e:
         # Log error but continue with empty roles
@@ -122,7 +128,9 @@ def _build_user_response_with_roles(
 @router.get("", response_model=list[UserResponse], tags=["users"])
 def list_users(
     search: Optional[str] = Query(None, description="Search by name or email"),
-    include_inactive: Optional[bool] = Query(False, description="Include inactive users"),
+    include_inactive: Optional[bool] = Query(
+        False, description="Include inactive users"
+    ),
     current_user: User = Depends(require_permission("users:view")),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
@@ -268,7 +276,6 @@ def create_user_endpoint(
 
     # Increment platform metrics using a separate session to avoid "Connection is closed" errors
     # This ensures we have a fresh connection for the metrics operation
-    from sqlalchemy import text
 
     from app.core.database import SessionLocal
     from app.services.tenant_metrics_service import increment_users
@@ -288,7 +295,9 @@ def create_user_endpoint(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to increment user metrics (non-critical): {e}", exc_info=True)
+        logger.warning(
+            f"Failed to increment user metrics (non-critical): {e}", exc_info=True
+        )
 
     # Send invitation email
     email_sent = False
@@ -341,7 +350,9 @@ def create_user_endpoint(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to send user invitation email to {user.email}: {e}", exc_info=True)
+        logger.error(
+            f"Failed to send user invitation email to {user.email}: {e}", exc_info=True
+        )
 
         # Log failure to email_logs
         from app.models.email_log import EmailLog
@@ -716,7 +727,9 @@ def resend_invitation(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to resend invitation email to {user.email}: {e}", exc_info=True)
+        logger.error(
+            f"Failed to resend invitation email to {user.email}: {e}", exc_info=True
+        )
 
         # Log failure to email_logs
         from app.models.email_log import EmailLog
@@ -756,7 +769,9 @@ def resend_invitation(
         )
 
 
-@router.post("/{user_id}/force-password-change", response_model=UserResponse, tags=["users"])
+@router.post(
+    "/{user_id}/force-password-change", response_model=UserResponse, tags=["users"]
+)
 def force_password_change_endpoint(
     user_id: UUID,
     current_user: User = Depends(require_permission("users:update")),

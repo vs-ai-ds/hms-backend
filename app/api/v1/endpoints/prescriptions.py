@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_doctor_or_admin(ctx: TenantContext, db: Session) -> None:
-    role_names = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    role_names = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     if not (
         RoleName.DOCTOR.value in role_names
         or RoleName.HOSPITAL_ADMIN.value in role_names
@@ -120,11 +122,17 @@ def _build_response_from_instance(prescription) -> PrescriptionResponse:
         items=items_resp,
         patient_name=patient_name,
         doctor_name=doctor_name,
-        visit_type="OPD" if prescription.appointment_id else "IPD" if prescription.admission_id else None,
+        visit_type="OPD"
+        if prescription.appointment_id
+        else "IPD"
+        if prescription.admission_id
+        else None,
     )
 
 
-@router.post("", response_model=PrescriptionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=PrescriptionResponse, status_code=status.HTTP_201_CREATED
+)
 def create_prescription_endpoint(
     payload: PrescriptionCreate,
     db: Session = Depends(get_db),
@@ -134,8 +142,8 @@ def create_prescription_endpoint(
     _ensure_doctor_or_admin(ctx, db)
 
     # Determine doctor_user_id: use payload if provided (for non-doctor users), otherwise use current user
-    #current_roles = set(get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name))
-    #current_is_doctor = "DOCTOR" in current_roles
+    # current_roles = set(get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name))
+    # current_is_doctor = "DOCTOR" in current_roles
 
     # If payload provides doctor_user_id, validate it (for non-doctor users creating prescriptions)
     if payload.doctor_user_id:
@@ -143,10 +151,16 @@ def create_prescription_endpoint(
         if not doctor_user:
             raise HTTPException(status_code=404, detail="Selected doctor not found")
 
-        doctor_roles = set(get_user_role_names(db, doctor_user, tenant_schema_name=ctx.tenant.schema_name))
+        doctor_roles = set(
+            get_user_role_names(
+                db, doctor_user, tenant_schema_name=ctx.tenant.schema_name
+            )
+        )
         if "DOCTOR" not in doctor_roles:
             doctor_name = (
-                f"{doctor_user.first_name} {doctor_user.last_name}".strip() or doctor_user.email or "the selected user"
+                f"{doctor_user.first_name} {doctor_user.last_name}".strip()
+                or doctor_user.email
+                or "the selected user"
             )
             raise HTTPException(
                 status_code=400,
@@ -161,7 +175,10 @@ def create_prescription_endpoint(
     if payload.appointment_id:
         active_admission = (
             db.query(Admission)
-            .filter(Admission.patient_id == payload.patient_id, Admission.status == AdmissionStatus.ACTIVE)
+            .filter(
+                Admission.patient_id == payload.patient_id,
+                Admission.status == AdmissionStatus.ACTIVE,
+            )
             .first()
         )
         if active_admission:
@@ -170,11 +187,19 @@ def create_prescription_endpoint(
                 detail="Cannot create OPD prescription for patient with active admission. Please discharge the patient first.",
             )
 
-        appointment = db.query(Appointment).filter(Appointment.id == payload.appointment_id).first()
+        appointment = (
+            db.query(Appointment)
+            .filter(Appointment.id == payload.appointment_id)
+            .first()
+        )
         if not appointment:
             raise HTTPException(status_code=404, detail="Appointment not found.")
 
-        if appointment.status in [AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]:
+        if appointment.status in [
+            AppointmentStatus.COMPLETED,
+            AppointmentStatus.CANCELLED,
+            AppointmentStatus.NO_SHOW,
+        ]:
             raise HTTPException(
                 status_code=400,
                 detail="Cannot create prescription for appointment with status COMPLETED, CANCELLED, or NO_SHOW.",
@@ -189,15 +214,23 @@ def create_prescription_endpoint(
             .first()
         )
         if existing_rx:
-            raise HTTPException(status_code=409, detail="A prescription already exists for this appointment.")
+            raise HTTPException(
+                status_code=409,
+                detail="A prescription already exists for this appointment.",
+            )
 
     # IPD validations
     if payload.admission_id:
-        admission = db.query(Admission).filter(Admission.id == payload.admission_id).first()
+        admission = (
+            db.query(Admission).filter(Admission.id == payload.admission_id).first()
+        )
         if not admission:
             raise HTTPException(status_code=404, detail="Admission not found.")
         if admission.patient_id != payload.patient_id:
-            raise HTTPException(status_code=400, detail="Admission does not belong to the specified patient.")
+            raise HTTPException(
+                status_code=400,
+                detail="Admission does not belong to the specified patient.",
+            )
         if admission.status != AdmissionStatus.ACTIVE:
             raise HTTPException(status_code=400, detail="Admission is not active.")
 
@@ -224,16 +257,25 @@ def create_prescription_endpoint(
     try:
         response = _build_response_from_instance(prescription)
     except Exception as e:
-        logger.warning("Response build failed (non-fatal). rx=%s err=%s", rx_id, e, exc_info=True)
+        logger.warning(
+            "Response build failed (non-fatal). rx=%s err=%s", rx_id, e, exc_info=True
+        )
         response = PrescriptionResponse.model_validate(prescription)
 
     # Best-effort post actions must never cause a 500
     if prescription.appointment_id:
         try:
-            apt = db.query(Appointment).filter(Appointment.id == prescription.appointment_id).first()
+            apt = (
+                db.query(Appointment)
+                .filter(Appointment.id == prescription.appointment_id)
+                .first()
+            )
             if apt:
                 now = datetime.now(timezone.utc)
-                if apt.status in [AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN]:
+                if apt.status in [
+                    AppointmentStatus.SCHEDULED,
+                    AppointmentStatus.CHECKED_IN,
+                ]:
                     apt.status = AppointmentStatus.IN_CONSULTATION
                     if not getattr(apt, "consultation_started_at", None):
                         apt.consultation_started_at = now
@@ -247,7 +289,12 @@ def create_prescription_endpoint(
                 except SQLAlchemyError:
                     db.rollback()
         except Exception as e:
-            logger.warning("Non-fatal: appointment update failed. rx=%s err=%s", rx_id, e, exc_info=True)
+            logger.warning(
+                "Non-fatal: appointment update failed. rx=%s err=%s",
+                rx_id,
+                e,
+                exc_info=True,
+            )
 
     # No email sent on prescription creation - email is sent only when prescription is issued
 
@@ -265,13 +312,17 @@ def list_prescriptions_endpoint(
     status: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
-    order_by: str | None = Query(None, description="Sort by field: 'created_at' (asc/desc)"),
+    order_by: str | None = Query(
+        None, description="Sort by field: 'created_at' (asc/desc)"
+    ),
     db: Session = Depends(get_db),
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> list[PrescriptionResponse]:
     ensure_search_path(db, ctx.tenant.schema_name)
 
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
     is_pharmacist = "PHARMACIST" in user_roles
@@ -363,7 +414,9 @@ def list_prescriptions_endpoint(
             (Prescription.status == PrescriptionStatus.CANCELLED, 4),
             else_=5,
         )
-        prescriptions = query.order_by(status_priority, Prescription.created_at.desc()).all()
+        prescriptions = query.order_by(
+            status_priority, Prescription.created_at.desc()
+        ).all()
 
     results: list[PrescriptionResponse] = []
     for p in prescriptions:
@@ -385,7 +438,9 @@ def get_prescription_endpoint(
     except PrescriptionNotFoundError:
         raise HTTPException(status_code=404, detail="Prescription not found")
 
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
     is_pharmacist = "PHARMACIST" in user_roles
@@ -394,12 +449,15 @@ def get_prescription_endpoint(
     if is_doctor and not (is_admin or is_pharmacist or is_receptionist):
         if prescription.doctor_user_id != ctx.user.id:
             raise HTTPException(
-                status_code=403, detail="Access restricted. You can only view prescriptions created by you."
+                status_code=403,
+                detail="Access restricted. You can only view prescriptions created by you.",
             )
 
     # Make sure response always includes the same computed fields as list()
     try:
-        prescription = _reload_prescription_with_relations(db, prescription_id, ctx.tenant.schema_name)
+        prescription = _reload_prescription_with_relations(
+            db, prescription_id, ctx.tenant.schema_name
+        )
     except HTTPException:
         # Fall back to what service returned if reload fails for any reason
         pass
@@ -417,7 +475,9 @@ def update_prescription_endpoint(
     ensure_search_path(db, ctx.tenant.schema_name)
     _ensure_doctor_or_admin(ctx, db)
 
-    prescription = db.query(Prescription).filter(Prescription.id == prescription_id).first()
+    prescription = (
+        db.query(Prescription).filter(Prescription.id == prescription_id).first()
+    )
     if not prescription:
         raise HTTPException(status_code=404, detail="Prescription not found")
 
@@ -427,20 +487,25 @@ def update_prescription_endpoint(
             detail=f"Cannot edit prescription with status {prescription.status.value}. Only DRAFT prescriptions can be edited.",
         )
 
-    role_names = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    role_names = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_admin = "HOSPITAL_ADMIN" in role_names or "SUPER_ADMIN" in role_names
     is_doctor = "DOCTOR" in role_names
 
     if is_doctor and not is_admin and prescription.doctor_user_id != ctx.user.id:
         raise HTTPException(
-            status_code=403, detail="Access restricted. You can only edit prescriptions created by you."
+            status_code=403,
+            detail="Access restricted. You can only edit prescriptions created by you.",
         )
 
     try:
         prescription.chief_complaint = payload.chief_complaint
         prescription.diagnosis = payload.diagnosis
 
-        db.query(PrescriptionItem).filter(PrescriptionItem.prescription_id == prescription_id).delete()
+        db.query(PrescriptionItem).filter(
+            PrescriptionItem.prescription_id == prescription_id
+        ).delete()
 
         for item_data in payload.items:
             db.add(
@@ -463,7 +528,9 @@ def update_prescription_endpoint(
         raise HTTPException(status_code=500, detail="Failed to update prescription.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    prescription = _reload_prescription_with_relations(db, prescription_id, ctx.tenant.schema_name)
+    prescription = _reload_prescription_with_relations(
+        db, prescription_id, ctx.tenant.schema_name
+    )
 
     # 3) Return response
     return _build_response_from_instance(prescription)
@@ -477,16 +544,25 @@ def dispense_prescription(
 ) -> PrescriptionResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
 
-    user_roles = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    user_roles = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_pharmacist = "PHARMACIST" in user_roles
     is_admin = "HOSPITAL_ADMIN" in user_roles or "SUPER_ADMIN" in user_roles
 
     if not (is_pharmacist or is_admin):
-        raise HTTPException(status_code=403, detail="Only pharmacists or admins can dispense prescriptions.")
+        raise HTTPException(
+            status_code=403,
+            detail="Only pharmacists or admins can dispense prescriptions.",
+        )
 
     prescription = (
         db.query(Prescription)
-        .options(joinedload(Prescription.patient), joinedload(Prescription.doctor), joinedload(Prescription.items))
+        .options(
+            joinedload(Prescription.patient),
+            joinedload(Prescription.doctor),
+            joinedload(Prescription.items),
+        )
         .filter(Prescription.id == prescription_id)
         .first()
     )
@@ -502,9 +578,14 @@ def dispense_prescription(
     deductions = []
     for item in prescription.items or []:
         if item.stock_item_id and item.quantity:
-            stock_item = db.query(StockItem).filter(StockItem.id == item.stock_item_id).first()
+            stock_item = (
+                db.query(StockItem).filter(StockItem.id == item.stock_item_id).first()
+            )
             if not stock_item:
-                raise HTTPException(status_code=400, detail=f"Stock item not found for medicine '{item.medicine_name}'")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stock item not found for medicine '{item.medicine_name}'",
+                )
             if (stock_item.current_stock or 0) < item.quantity:
                 raise HTTPException(
                     status_code=400,
@@ -525,11 +606,17 @@ def dispense_prescription(
         raise HTTPException(status_code=500, detail="Failed to dispense prescription.")
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    prescription = _reload_prescription_with_relations(db, prescription_id, ctx.tenant.schema_name)
+    prescription = _reload_prescription_with_relations(
+        db, prescription_id, ctx.tenant.schema_name
+    )
 
     # 3) Notifications (best-effort) - Enhanced email with details
     patient = prescription.patient
-    if patient and getattr(patient, "consent_email", False) and getattr(patient, "email", None):
+    if (
+        patient
+        and getattr(patient, "consent_email", False)
+        and getattr(patient, "email", None)
+    ):
         try:
             # Get doctor name
             doctor = getattr(prescription, "doctor", None)
@@ -559,13 +646,19 @@ def dispense_prescription(
             ]
 
             if doctor_name:
-                email_body_parts.append(f"<p><strong>Prescribed by:</strong> Dr. {doctor_name}</p>")
+                email_body_parts.append(
+                    f"<p><strong>Prescribed by:</strong> Dr. {doctor_name}</p>"
+                )
 
             if prescription.chief_complaint:
-                email_body_parts.append(f"<p><strong>Chief Complaint:</strong> {prescription.chief_complaint}</p>")
+                email_body_parts.append(
+                    f"<p><strong>Chief Complaint:</strong> {prescription.chief_complaint}</p>"
+                )
 
             if prescription.diagnosis:
-                email_body_parts.append(f"<p><strong>Diagnosis:</strong> {prescription.diagnosis}</p>")
+                email_body_parts.append(
+                    f"<p><strong>Diagnosis:</strong> {prescription.diagnosis}</p>"
+                )
 
             if items_data:
                 email_body_parts.append("<p><strong>Medicines Dispensed:</strong></p>")
@@ -607,7 +700,9 @@ def dispense_prescription(
                 check_patient_flag=True,
             )
         except Exception:
-            logger.exception("Non-fatal: dispense notification failed. rx=%s", prescription_id)
+            logger.exception(
+                "Non-fatal: dispense notification failed. rx=%s", prescription_id
+            )
 
     # 4) Return response
     return _build_response_from_instance(prescription)
@@ -621,7 +716,9 @@ def update_prescription_status(
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> PrescriptionResponse:
     ensure_search_path(db, ctx.tenant.schema_name)
-    prescription = _reload_prescription_with_relations(db, prescription_id, ctx.tenant.schema_name)
+    prescription = _reload_prescription_with_relations(
+        db, prescription_id, ctx.tenant.schema_name
+    )
 
     if "status" not in payload:
         raise HTTPException(status_code=400, detail="Status is required")
@@ -629,9 +726,13 @@ def update_prescription_status(
     try:
         new_status = PrescriptionStatus(payload["status"])
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid status: {payload['status']}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid status: {payload['status']}"
+        )
 
-    role_names = get_user_role_names(db, ctx.user, tenant_schema_name=ctx.tenant.schema_name)
+    role_names = get_user_role_names(
+        db, ctx.user, tenant_schema_name=ctx.tenant.schema_name
+    )
     is_doctor = "DOCTOR" in role_names
     is_admin = "HOSPITAL_ADMIN" in role_names or "SUPER_ADMIN" in role_names
     is_pharmacist = "PHARMACIST" in role_names
@@ -644,14 +745,19 @@ def update_prescription_status(
             allowed = True
         elif new_status == PrescriptionStatus.CANCELLED and (is_doctor or is_admin):
             if not payload.get("reason"):
-                raise HTTPException(status_code=400, detail="Cancellation reason is required.")
+                raise HTTPException(
+                    status_code=400, detail="Cancellation reason is required."
+                )
             allowed = True
     elif old_status == PrescriptionStatus.ISSUED:
         if new_status == PrescriptionStatus.DISPENSED and (is_pharmacist or is_admin):
             allowed = True
 
     if not allowed:
-        raise HTTPException(status_code=400, detail=f"Transition {old_status.value} -> {new_status.value} not allowed.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transition {old_status.value} -> {new_status.value} not allowed.",
+        )
 
     # 1) Commit status change
     try:
@@ -664,15 +770,23 @@ def update_prescription_status(
         ensure_search_path(db, ctx.tenant.schema_name)
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update prescription status.")
+        raise HTTPException(
+            status_code=500, detail="Failed to update prescription status."
+        )
 
     # 2) Reload with relations (prevents lazy-load/search_path issues)
-    prescription = _reload_prescription_with_relations(db, prescription_id, ctx.tenant.schema_name)
+    prescription = _reload_prescription_with_relations(
+        db, prescription_id, ctx.tenant.schema_name
+    )
 
     # 3) Side-effects (best-effort)
     if new_status == PrescriptionStatus.ISSUED and prescription.appointment_id:
         try:
-            apt = db.query(Appointment).filter(Appointment.id == prescription.appointment_id).first()
+            apt = (
+                db.query(Appointment)
+                .filter(Appointment.id == prescription.appointment_id)
+                .first()
+            )
             if apt and apt.status in [
                 AppointmentStatus.SCHEDULED,
                 AppointmentStatus.CHECKED_IN,
@@ -689,7 +803,9 @@ def update_prescription_status(
                 except SQLAlchemyError:
                     db.rollback()
         except Exception:
-            logger.exception("Non-fatal: appointment completion failed. rx=%s", prescription_id)
+            logger.exception(
+                "Non-fatal: appointment completion failed. rx=%s", prescription_id
+            )
 
     # 4) Create followup appointment if requested (best-effort)
     if new_status == PrescriptionStatus.ISSUED and payload.get("create_followup"):
@@ -702,7 +818,9 @@ def update_prescription_status(
                 # Parse scheduled_at datetime
                 try:
                     if isinstance(followup_scheduled_at, str):
-                        scheduled_utc = datetime.fromisoformat(followup_scheduled_at.replace("Z", "+00:00"))
+                        scheduled_utc = datetime.fromisoformat(
+                            followup_scheduled_at.replace("Z", "+00:00")
+                        )
                     else:
                         scheduled_utc = followup_scheduled_at
 
@@ -716,7 +834,10 @@ def update_prescription_status(
                     from app.utils.datetime_utils import is_valid_15_minute_interval
 
                     if not is_valid_15_minute_interval(scheduled_utc):
-                        logger.warning("Followup appointment time not in 15-minute interval: %s", scheduled_utc)
+                        logger.warning(
+                            "Followup appointment time not in 15-minute interval: %s",
+                            scheduled_utc,
+                        )
                         # Don't create followup appointment if time is invalid
                         scheduled_utc = None
                 except Exception as e:
@@ -725,12 +846,22 @@ def update_prescription_status(
 
                 if scheduled_utc:
                     # Validate department and doctor exist
-                    department = db.query(Department).filter(Department.id == UUID(followup_department_id)).first()
-                    doctor_user = db.query(User).filter(User.id == UUID(followup_doctor_id)).first()
+                    department = (
+                        db.query(Department)
+                        .filter(Department.id == UUID(followup_department_id))
+                        .first()
+                    )
+                    doctor_user = (
+                        db.query(User)
+                        .filter(User.id == UUID(followup_doctor_id))
+                        .first()
+                    )
 
                     if department and doctor_user:
                         # Check if doctor has DOCTOR role
-                        doctor_roles = get_user_role_names(db, doctor_user, tenant_schema_name=ctx.tenant.schema_name)
+                        doctor_roles = get_user_role_names(
+                            db, doctor_user, tenant_schema_name=ctx.tenant.schema_name
+                        )
                         if "DOCTOR" in doctor_roles:
                             # Create followup appointment
                             followup_appt = Appointment(
@@ -759,7 +890,9 @@ def update_prescription_status(
 
                                 # Send appointment notification (best-effort)
                                 try:
-                                    patient = followup_appt.patient if followup_appt else None
+                                    patient = (
+                                        followup_appt.patient if followup_appt else None
+                                    )
                                     if not patient:
                                         logger.warning(
                                             "Followup appointment has no patient. apt=%s",
@@ -822,10 +955,14 @@ def update_prescription_status(
                             except SQLAlchemyError:
                                 db.rollback()
                                 logger.exception(
-                                    "Failed to create followup appointment for prescription %s", prescription_id
+                                    "Failed to create followup appointment for prescription %s",
+                                    prescription_id,
                                 )
                         else:
-                            logger.warning("Followup doctor user %s does not have DOCTOR role", followup_doctor_id)
+                            logger.warning(
+                                "Followup doctor user %s does not have DOCTOR role",
+                                followup_doctor_id,
+                            )
                     else:
                         logger.warning(
                             "Followup department or doctor not found: dept=%s, doctor=%s",
@@ -833,7 +970,10 @@ def update_prescription_status(
                             followup_doctor_id,
                         )
         except Exception:
-            logger.exception("Non-fatal: followup appointment creation failed. rx=%s", prescription_id)
+            logger.exception(
+                "Non-fatal: followup appointment creation failed. rx=%s",
+                prescription_id,
+            )
 
     # Best-effort issued email with PDF attachment
     if new_status == PrescriptionStatus.ISSUED:
@@ -849,14 +989,18 @@ def update_prescription_status(
                 )
             elif not getattr(patient, "email", None):
                 logger.info(
-                    "Patient has no email. patient_id=%s, rx=%s", patient.id if patient else None, prescription_id
+                    "Patient has no email. patient_id=%s, rx=%s",
+                    patient.id if patient else None,
+                    prescription_id,
                 )
             else:
                 # Prepare prescription data dict for PDF generation
                 doctor = getattr(prescription, "doctor", None)
                 doctor_name = None
                 if doctor:
-                    doctor_name = f"{doctor.first_name} {doctor.last_name or ''}".strip()
+                    doctor_name = (
+                        f"{doctor.first_name} {doctor.last_name or ''}".strip()
+                    )
 
                 patient_name = f"{patient.first_name} {patient.last_name or ''}".strip()
                 patient_code = getattr(patient, "patient_code", None) or "N/A"
@@ -868,11 +1012,17 @@ def update_prescription_status(
 
                     try:
                         if isinstance(patient.dob, str):
-                            dob = datetime.fromisoformat(patient.dob.replace("Z", "+00:00")).date()
+                            dob = datetime.fromisoformat(
+                                patient.dob.replace("Z", "+00:00")
+                            ).date()
                         else:
                             dob = patient.dob
                         today = date.today()
-                        patient_age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                        patient_age = (
+                            today.year
+                            - dob.year
+                            - ((today.month, today.day) < (dob.month, dob.day))
+                        )
                     except Exception:
                         pass
 
@@ -917,17 +1067,27 @@ def update_prescription_status(
 
                 # Format appointment date if available
                 appointment_date_str = ""
-                if prescription.appointment_id and hasattr(prescription, "appointment") and prescription.appointment:
+                if (
+                    prescription.appointment_id
+                    and hasattr(prescription, "appointment")
+                    and prescription.appointment
+                ):
                     apt = prescription.appointment
                     if hasattr(apt, "scheduled_at") and apt.scheduled_at:
                         try:
                             if isinstance(apt.scheduled_at, str):
-                                apt_date = datetime.fromisoformat(apt.scheduled_at.replace("Z", "+00:00"))
+                                apt_date = datetime.fromisoformat(
+                                    apt.scheduled_at.replace("Z", "+00:00")
+                                )
                             else:
                                 apt_date = apt.scheduled_at
-                            appointment_date_str = apt_date.strftime("%B %d, %Y at %I:%M %p")
+                            appointment_date_str = apt_date.strftime(
+                                "%B %d, %Y at %I:%M %p"
+                            )
                         except Exception:
-                            appointment_date_str = str(apt.scheduled_at) if apt.scheduled_at else ""
+                            appointment_date_str = (
+                                str(apt.scheduled_at) if apt.scheduled_at else ""
+                            )
 
                 # Build detailed email body
                 email_body_parts = [
@@ -936,19 +1096,29 @@ def update_prescription_status(
                 ]
 
                 if appointment_date_str:
-                    email_body_parts.append(f"<p><strong>Appointment Date:</strong> {appointment_date_str}</p>")
+                    email_body_parts.append(
+                        f"<p><strong>Appointment Date:</strong> {appointment_date_str}</p>"
+                    )
 
                 if doctor_name:
-                    email_body_parts.append(f"<p><strong>Prescribed by:</strong> Dr. {doctor_name}</p>")
+                    email_body_parts.append(
+                        f"<p><strong>Prescribed by:</strong> Dr. {doctor_name}</p>"
+                    )
 
                 if prescription.chief_complaint:
-                    email_body_parts.append(f"<p><strong>Chief Complaint:</strong> {prescription.chief_complaint}</p>")
+                    email_body_parts.append(
+                        f"<p><strong>Chief Complaint:</strong> {prescription.chief_complaint}</p>"
+                    )
 
                 if prescription.diagnosis:
-                    email_body_parts.append(f"<p><strong>Diagnosis:</strong> {prescription.diagnosis}</p>")
+                    email_body_parts.append(
+                        f"<p><strong>Diagnosis:</strong> {prescription.diagnosis}</p>"
+                    )
 
                 if items_data:
-                    email_body_parts.append("<p><strong>Medicines Prescribed:</strong></p>")
+                    email_body_parts.append(
+                        "<p><strong>Medicines Prescribed:</strong></p>"
+                    )
                     email_body_parts.append("<ul>")
                     for item in items_data:
                         med_info = f"{item['medicine_name']}"
@@ -999,7 +1169,11 @@ def update_prescription_status(
                     patient.email,
                 )
         except Exception as e:
-            logger.exception("Non-fatal: issue notification failed. rx=%s, error=%s", prescription_id, str(e))
+            logger.exception(
+                "Non-fatal: issue notification failed. rx=%s, error=%s",
+                prescription_id,
+                str(e),
+            )
 
     # 4) Return response
     return _build_response_from_instance(prescription)

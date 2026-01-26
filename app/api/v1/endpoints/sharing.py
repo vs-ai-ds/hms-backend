@@ -83,9 +83,13 @@ def list_sharing_requests(
     ensure_search_path(db, ctx.tenant.schema_name)
 
     if direction == "incoming":
-        query = db.query(SharingRequest).filter(SharingRequest.to_tenant_id == ctx.tenant.id)
+        query = db.query(SharingRequest).filter(
+            SharingRequest.to_tenant_id == ctx.tenant.id
+        )
     else:
-        query = db.query(SharingRequest).filter(SharingRequest.from_tenant_id == ctx.tenant.id)
+        query = db.query(SharingRequest).filter(
+            SharingRequest.from_tenant_id == ctx.tenant.id
+        )
 
     requests = query.order_by(SharingRequest.created_at.desc()).all()
     return [SharingRequestResponse.model_validate(r) for r in requests]

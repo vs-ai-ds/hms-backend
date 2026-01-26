@@ -42,7 +42,9 @@ class AppointmentResponse(BaseModel):
     department: str | None = None
     has_prescription: bool = False  # Derived: prescription exists for this appointment
     prescription_count: int = 0  # Number of prescriptions linked to this appointment
-    prescription_status: PrescriptionStatus | None = None  # Latest prescription status if any
+    prescription_status: PrescriptionStatus | None = (
+        None  # Latest prescription status if any
+    )
 
     class Config:
         from_attributes = True

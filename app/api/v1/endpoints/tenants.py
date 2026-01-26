@@ -12,7 +12,11 @@ from app.services.notification_service import send_notification_email
 from app.services.tenant_service import register_tenant
 from app.services.user_service import create_hospital_admin_for_tenant
 from app.utils.email_templates import render_registration_email
-from app.utils.token_utils import create_verification_token, mark_token_used, verify_token
+from app.utils.token_utils import (
+    create_verification_token,
+    mark_token_used,
+    verify_token,
+)
 
 settings = get_settings()
 
@@ -162,7 +166,9 @@ def tenant_self_register(
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Registration email sent successfully to {tenant.contact_email}")
+            logger.info(
+                f"Registration email sent successfully to {tenant.contact_email}"
+            )
         except Exception as e:
             # Log but don't fail registration if email fails
             import logging

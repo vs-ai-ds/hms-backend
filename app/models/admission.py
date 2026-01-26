@@ -125,4 +125,6 @@ class Admission(Base):
 
     # Relationships
     patient: Mapped["Patient"] = relationship("Patient", backref="admissions")
-    primary_doctor: Mapped["User"] = relationship("User", foreign_keys=[primary_doctor_user_id])
+    primary_doctor: Mapped["User"] = relationship(
+        "User", foreign_keys=[primary_doctor_user_id]
+    )

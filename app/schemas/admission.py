@@ -10,7 +10,9 @@ from app.models.admission import AdmissionStatus
 class AdmissionCreate(BaseModel):
     patient_id: UUID
     department_id: UUID | None = None  # Optional - Backend will auto-set for doctors
-    primary_doctor_user_id: UUID | None = None  # Optional - Backend will auto-set for doctors
+    primary_doctor_user_id: UUID | None = (
+        None  # Optional - Backend will auto-set for doctors
+    )
     admit_datetime: datetime
     notes: str | None = None
 

@@ -39,6 +39,7 @@ Run:
   python -m scripts.seed_demo_data --reset
   python -m scripts.seed_demo_data --freshen --freshen-days 7
 """
+
 from __future__ import annotations
 
 import argparse
@@ -56,10 +57,6 @@ from sqlalchemy import String, cast, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
-
-# Allow "python -m scripts.seed_demo_data" from repo root
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
 
 from app.core.security import get_password_hash  # type: ignore
 from app.core.config import get_settings  # type: ignore
@@ -87,7 +84,17 @@ from app.services.tenant_metrics_service import (  # type: ignore
     increment_users,
 )
 
+# Allow "python -m scripts.seed_demo_data" from repo root
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
 logger = logging.getLogger(__name__)
+
+
+def emit_progress(percent: int, message: str) -> None:
+    """Emit a progress marker in stable format for backend parsing."""
+    print(f"HMS_PROGRESS|{percent}|{message}", flush=True)
+
 
 DEMO_PASSWORD = "Demo@12345"
 DEMO_TENANT_A_LICENSE = "DEMO-TENANT-A-011"
@@ -101,8 +108,10 @@ DATA_DIR = REPO_ROOT / "scripts" / "demo_data"
 # ----------------------------
 _seed_settings = get_settings()
 
+
 def _is_pooler_url(url: str) -> bool:
     return ":6543" in url or "pooler.supabase.com" in url
+
 
 # Prefer direct URL for seed/DDL if provided, else fallback to normal DATABASE_URL
 _seed_db_url = _seed_settings.database_url
@@ -127,6 +136,7 @@ SeedSessionLocal = sessionmaker(
     future=True,
     expire_on_commit=False,
 )
+
 
 # ----------------------------
 # Pooler-safe schema switching
@@ -206,7 +216,10 @@ def _column_exists(db: Session, schema: str, table: str, column: str) -> bool:
         LIMIT 1
         """
     )
-    return db.execute(q, {"schema": schema, "table": table, "column": column}).first() is not None
+    return (
+        db.execute(q, {"schema": schema, "table": table, "column": column}).first()
+        is not None
+    )
 
 
 def demo_email(suffix: str, username: str) -> str:
@@ -285,7 +298,11 @@ def get_or_create_demo_tenant(db: Session, spec: DemoTenantSpec) -> Tenant:
     Minimums (roles/depts/etc.) are tenant-schema concerns.
     """
     with public_scope(db):
-        existing = db.query(Tenant).filter(Tenant.license_number == spec.license_number).first()
+        existing = (
+            db.query(Tenant)
+            .filter(Tenant.license_number == spec.license_number)
+            .first()
+        )
 
         if existing:
             if existing.status != TenantStatus.ACTIVE:
@@ -293,6 +310,7 @@ def get_or_create_demo_tenant(db: Session, spec: DemoTenantSpec) -> Tenant:
                 db.commit()
 
             from app.services.tenant_service import ensure_tenant_tables_exist  # type: ignore
+
             ensure_tenant_tables_exist(db, existing.schema_name)
 
             with tenant_scope(db, existing.schema_name):
@@ -317,6 +335,7 @@ def get_or_create_demo_tenant(db: Session, spec: DemoTenantSpec) -> Tenant:
         db.flush()
 
         from app.services.tenant_service import ensure_tenant_tables_exist  # type: ignore
+
         ensure_tenant_tables_exist(db, tenant.schema_name)
 
         with tenant_scope(db, tenant.schema_name):
@@ -326,7 +345,9 @@ def get_or_create_demo_tenant(db: Session, spec: DemoTenantSpec) -> Tenant:
         return tenant
 
 
-def fetch_system_roles_and_departments(db: Session) -> tuple[dict[str, TenantRole], dict[str, Department]]:
+def fetch_system_roles_and_departments(
+    db: Session,
+) -> tuple[dict[str, TenantRole], dict[str, Department]]:
     roles = db.query(TenantRole).all()
     depts = db.query(Department).all()
     return (
@@ -362,7 +383,9 @@ def ensure_user_role(db: Session, user: User, role: TenantRole) -> None:
     db.flush()
 
 
-def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict[str, User]:
+def upsert_demo_staff(
+    db: Session, tenant: Tenant, spec: DemoTenantSpec
+) -> dict[str, User]:
     # Roles/depts are tenant tables
     with tenant_scope(db, tenant.schema_name):
         roles_map, dept_map = fetch_system_roles_and_departments(db)
@@ -382,7 +405,11 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
     ) -> User:
         # Users live in public schema
         with public_scope(db):
-            existing = db.query(User).filter(User.email == email, User.tenant_id == tenant.id).first()
+            existing = (
+                db.query(User)
+                .filter(User.email == email, User.tenant_id == tenant.id)
+                .first()
+            )
             if existing:
                 existing.status = UserStatus.ACTIVE
                 existing.is_active = True
@@ -416,8 +443,16 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
             db.flush()
             return u
 
-    admin_dept_name = dept_map.get("Administrator").name if dept_map.get("Administrator") else "Administrator"
-    general_med_name = dept_map.get("General Medicine").name if dept_map.get("General Medicine") else "General Medicine"
+    admin_dept_name = (
+        dept_map.get("Administrator").name
+        if dept_map.get("Administrator")
+        else "Administrator"
+    )
+    general_med_name = (
+        dept_map.get("General Medicine").name
+        if dept_map.get("General Medicine")
+        else "General Medicine"
+    )
 
     users: dict[str, User] = {}
 
@@ -433,7 +468,13 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
 
     for i in range(1, 3):
         fn, ln = pick_name()
-        u = mk_user(demo_email(spec.suffix, f"doctor{i}"), fn, ln, general_med_name, "General Medicine")
+        u = mk_user(
+            demo_email(spec.suffix, f"doctor{i}"),
+            fn,
+            ln,
+            general_med_name,
+            "General Medicine",
+        )
         with tenant_scope(db, tenant.schema_name):
             if "DOCTOR" in roles_map:
                 ensure_user_role(db, u, roles_map["DOCTOR"])
@@ -441,7 +482,9 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
 
     for i in range(1, 3):
         fn, ln = pick_name()
-        u = mk_user(demo_email(spec.suffix, f"nurse{i}"), fn, ln, general_med_name, None)
+        u = mk_user(
+            demo_email(spec.suffix, f"nurse{i}"), fn, ln, general_med_name, None
+        )
         with tenant_scope(db, tenant.schema_name):
             if "NURSE" in roles_map:
                 ensure_user_role(db, u, roles_map["NURSE"])
@@ -449,7 +492,9 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
 
     for i in range(1, 3):
         fn, ln = pick_name()
-        u = mk_user(demo_email(spec.suffix, f"pharmacist{i}"), fn, ln, general_med_name, None)
+        u = mk_user(
+            demo_email(spec.suffix, f"pharmacist{i}"), fn, ln, general_med_name, None
+        )
         with tenant_scope(db, tenant.schema_name):
             if "PHARMACIST" in roles_map:
                 ensure_user_role(db, u, roles_map["PHARMACIST"])
@@ -457,7 +502,9 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
 
     for i in range(1, 3):
         fn, ln = pick_name()
-        u = mk_user(demo_email(spec.suffix, f"receptionist{i}"), fn, ln, admin_dept_name, None)
+        u = mk_user(
+            demo_email(spec.suffix, f"receptionist{i}"), fn, ln, admin_dept_name, None
+        )
         with tenant_scope(db, tenant.schema_name):
             if "RECEPTIONIST" in roles_map:
                 ensure_user_role(db, u, roles_map["RECEPTIONIST"])
@@ -466,10 +513,13 @@ def upsert_demo_staff(db: Session, tenant: Tenant, spec: DemoTenantSpec) -> dict
     db.commit()
     return users
 
+
 # ----------------------------
 # Stock
 # ----------------------------
-def upsert_stock_catalog(db: Session, tenant: Tenant, suffix: str, created_by_id) -> list[StockItem]:
+def upsert_stock_catalog(
+    db: Session, tenant: Tenant, suffix: str, created_by_id
+) -> list[StockItem]:
     catalog = load_json("stock_catalog.json")
     out: list[StockItem] = []
 
@@ -481,7 +531,9 @@ def upsert_stock_catalog(db: Session, tenant: Tenant, suffix: str, created_by_id
         except Exception:
             pass
 
-        def get_existing_id(type_: StockItemType, name: str, form: str | None, strength: str | None):
+        def get_existing_id(
+            type_: StockItemType, name: str, form: str | None, strength: str | None
+        ):
             """
             IMPORTANT:
             We query ONLY StockItem.id (UUID) to avoid selecting enum columns.
@@ -496,7 +548,9 @@ def upsert_stock_catalog(db: Session, tenant: Tenant, suffix: str, created_by_id
                 q = q.filter(StockItem.strength == strength)
             return q.first()
 
-        def get_existing(type_: StockItemType, name: str, form: str | None, strength: str | None) -> StockItem | None:
+        def get_existing(
+            type_: StockItemType, name: str, form: str | None, strength: str | None
+        ) -> StockItem | None:
             row = get_existing_id(type_, name, form, strength)
             if not row:
                 return None
@@ -572,10 +626,13 @@ def upsert_stock_catalog(db: Session, tenant: Tenant, suffix: str, created_by_id
         db.commit()
         return out
 
+
 # ----------------------------
 # Patients
 # ----------------------------
-def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, count: int = 100) -> list[Patient]:
+def upsert_patients(
+    db: Session, tenant: Tenant, suffix: str, created_by_id, count: int = 100
+) -> list[Patient]:
     names = load_json("names_in.json")
     locs = load_json("locations_in.json")
     clinical = load_json("clinical_catalog.json")
@@ -583,13 +640,15 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
     with tenant_scope(db, tenant.schema_name):
         existing = (
             db.query(Patient)
-            .filter(Patient.clinical_notes.like(f"{demo_tag(suffix,'patient','%')}%"))
+            .filter(Patient.clinical_notes.like(f"{demo_tag(suffix, 'patient', '%')}%"))
             .count()
         )
         if existing >= count:
             return (
                 db.query(Patient)
-                .filter(Patient.clinical_notes.like(f"{demo_tag(suffix,'patient','%')}%"))
+                .filter(
+                    Patient.clinical_notes.like(f"{demo_tag(suffix, 'patient', '%')}%")
+                )
                 .limit(count)
                 .all()
             )
@@ -607,8 +666,8 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
 
             dob = rand_dob()
             dob_unknown = dob is None
-            #consent_email = random.random() < 0.35
-            #consent_sms = random.random() < 0.55
+            # consent_email = random.random() < 0.35
+            # consent_sms = random.random() < 0.55
             consent_email = True
             consent_sms = True
 
@@ -617,7 +676,9 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
                 created_by_id=created_by_id,
                 updated_by_id=created_by_id,
                 first_name=fn,
-                middle_name=None if random.random() < 0.7 else random.choice(names["first_names"]),
+                middle_name=None
+                if random.random() < 0.7
+                else random.choice(names["first_names"]),
                 last_name=ln if random.random() < 0.9 else None,
                 gender=random.choice(["MALE", "FEMALE", "OTHER", "UNKNOWN"]),
                 dob=dob,
@@ -642,19 +703,23 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
                 preferred_language=random.choice(clinical["languages"]),
                 known_allergies=None if random.random() < 0.7 else "Dust allergy",
                 chronic_conditions=None if random.random() < 0.75 else "Hypertension",
-                clinical_notes=f"{demo_tag(suffix,'patient',str(i))} | Seeded demo patient record",
+                clinical_notes=f"{demo_tag(suffix, 'patient', str(i))} | Seeded demo patient record",
                 national_id_type=None if random.random() < 0.85 else "Aadhaar",
                 national_id_number=None
                 if random.random() < 0.85
-                else f"{random.randint(1000,9999)}-{random.randint(1000,9999)}-{random.randint(1000,9999)}",
+                else f"{random.randint(1000, 9999)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
                 consent_sms=bool(consent_sms),
                 consent_email=bool(consent_email),
             )
 
             # “created over time”. DB enforces created_at default.
-            created_dt = utcnow() - timedelta(days=random.randint(0, 365), hours=random.randint(0, 23))
+            created_dt = utcnow() - timedelta(
+                days=random.randint(0, 365), hours=random.randint(0, 23)
+            )
             _safe_setattr(p, "created_at", created_dt)
-            _safe_setattr(p, "updated_at", created_dt + timedelta(days=random.randint(0, 60)))
+            _safe_setattr(
+                p, "updated_at", created_dt + timedelta(days=random.randint(0, 60))
+            )
 
             db.add(p)
             patients.append(p)
@@ -662,7 +727,9 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
         db.commit()
 
         if _column_exists(db, tenant.schema_name, "patients", "created_at"):
-            has_updated_at = _column_exists(db, tenant.schema_name, "patients", "updated_at")
+            has_updated_at = _column_exists(
+                db, tenant.schema_name, "patients", "updated_at"
+            )
             now = utcnow()
 
             def pick_recent_created_at() -> datetime:
@@ -684,11 +751,17 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
                 else:
                     days = random.randint(90, 540)
 
-                return now - timedelta(days=days, hours=random.randint(0, 23), minutes=random.randint(0, 59))
+                return now - timedelta(
+                    days=days,
+                    hours=random.randint(0, 23),
+                    minutes=random.randint(0, 59),
+                )
 
             for p in patients:
                 created_dt = pick_recent_created_at()
-                updated_dt = created_dt + timedelta(days=random.randint(0, 25), hours=random.randint(0, 12))
+                updated_dt = created_dt + timedelta(
+                    days=random.randint(0, 25), hours=random.randint(0, 12)
+                )
                 if updated_dt > now:
                     updated_dt = now - timedelta(hours=random.randint(0, 6))
 
@@ -720,10 +793,14 @@ def upsert_patients(db: Session, tenant: Tenant, suffix: str, created_by_id, cou
 
         return patients
 
-def split_patients_for_ipd(patients: list[Patient], ipd_count: int) -> tuple[list[Patient], list[Patient]]:
+
+def split_patients_for_ipd(
+    patients: list[Patient], ipd_count: int
+) -> tuple[list[Patient], list[Patient]]:
     pts = patients[:]
     random.shuffle(pts)
     return pts[:ipd_count], pts[ipd_count:]
+
 
 # ----------------------------
 # Admissions (IPD)
@@ -741,17 +818,23 @@ def create_ipd_admissions(
     reasons = clinical["ipd_reasons"]
 
     with tenant_scope(db, tenant.schema_name):
-        already = db.query(Admission).filter(Admission.notes.like(f"{demo_tag(suffix,'ad','%')}%")).count()
+        already = (
+            db.query(Admission)
+            .filter(Admission.notes.like(f"{demo_tag(suffix, 'ad', '%')}%"))
+            .count()
+        )
         if already >= count:
             return (
                 db.query(Admission)
-                .filter(Admission.notes.like(f"{demo_tag(suffix,'ad','%')}%"))
+                .filter(Admission.notes.like(f"{demo_tag(suffix, 'ad', '%')}%"))
                 .limit(count)
                 .all()
             )
 
         now = utcnow()
-        dept_choices = [d for d in departments if d.name != "Administrator"] or departments[:]
+        dept_choices = [
+            d for d in departments if d.name != "Administrator"
+        ] or departments[:]
         admissions: list[Admission] = []
         start = already + 1
         active_target = int(count * 0.30)
@@ -763,17 +846,25 @@ def create_ipd_admissions(
             dept = random.choice(dept_choices)
             reason = random.choice(reasons)
 
-            admit_dt = now - timedelta(days=random.randint(1, 90), hours=random.randint(0, 20))
-            status = AdmissionStatus.ACTIVE if patient.id in active_patients else AdmissionStatus.DISCHARGED
+            admit_dt = now - timedelta(
+                days=random.randint(1, 90), hours=random.randint(0, 20)
+            )
+            status = (
+                AdmissionStatus.ACTIVE
+                if patient.id in active_patients
+                else AdmissionStatus.DISCHARGED
+            )
 
             discharge_dt = None
             discharge_summary = None
             if status == AdmissionStatus.DISCHARGED:
                 stay_days = random.randint(1, 14)
-                discharge_dt = admit_dt + timedelta(days=stay_days, hours=random.randint(0, 10))
+                discharge_dt = admit_dt + timedelta(
+                    days=stay_days, hours=random.randint(0, 10)
+                )
                 if discharge_dt > now:
                     discharge_dt = now - timedelta(hours=random.randint(1, 12))
-                discharge_summary = f"{demo_tag(suffix,'ad_sum',str(i))} | Improved. Discharged with advice."
+                discharge_summary = f"{demo_tag(suffix, 'ad_sum', str(i))} | Improved. Discharged with advice."
 
             ad = Admission(
                 patient_id=patient.id,
@@ -783,7 +874,7 @@ def create_ipd_admissions(
                 discharge_datetime=discharge_dt,
                 discharge_summary=discharge_summary,
                 status=status,
-                notes=f"{demo_tag(suffix,'ad',str(i))} | {reason['reason']}",
+                notes=f"{demo_tag(suffix, 'ad', str(i))} | {reason['reason']}",
                 source_opd_appointment_id=None,
             )
             db.add(ad)
@@ -791,6 +882,7 @@ def create_ipd_admissions(
 
         db.commit()
         return admissions
+
 
 # ----------------------------
 # Appointments (OPD)
@@ -829,20 +921,28 @@ def create_opd_appointments(
 ) -> list[Appointment]:
     clinical = load_json("clinical_catalog.json")
     complaints = clinical["opd_complaints"]
-    cancel_notes = clinical.get("cancel_notes", ["Rescheduled", "Patient request", "Doctor unavailable"])
+    cancel_notes = clinical.get(
+        "cancel_notes", ["Rescheduled", "Patient request", "Doctor unavailable"]
+    )
 
     with tenant_scope(db, tenant.schema_name):
-        already = db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(suffix,'ap','%')}%")).count()
+        already = (
+            db.query(Appointment)
+            .filter(Appointment.notes.like(f"{demo_tag(suffix, 'ap', '%')}%"))
+            .count()
+        )
         if already >= count:
             return (
                 db.query(Appointment)
-                .filter(Appointment.notes.like(f"{demo_tag(suffix,'ap','%')}%"))
+                .filter(Appointment.notes.like(f"{demo_tag(suffix, 'ap', '%')}%"))
                 .limit(count)
                 .all()
             )
 
         now = utcnow()
-        dept_choices = [d for d in departments if d.name != "Administrator"] or departments[:]
+        dept_choices = [
+            d for d in departments if d.name != "Administrator"
+        ] or departments[:]
         appts: list[Appointment] = []
         start = already + 1
 
@@ -871,10 +971,12 @@ def create_opd_appointments(
                     AppointmentStatus.IN_CONSULTATION,
                     AppointmentStatus.COMPLETED,
                 ):
-                    scheduled_at = clinic_time(now, 0) - timedelta(hours=random.randint(0, 6))
+                    scheduled_at = clinic_time(now, 0) - timedelta(
+                        hours=random.randint(0, 6)
+                    )
                     scheduled_at = in_15_min_block(scheduled_at)
 
-                note = f"{demo_tag(suffix,'ap',str(seq))} | {c['complaint']}"
+                note = f"{demo_tag(suffix, 'ap', str(seq))} | {c['complaint']}"
                 ap = Appointment(
                     patient_id=patient.id,
                     department_id=dept.id,
@@ -909,11 +1011,15 @@ def create_opd_appointments(
             c = random.choice(complaints)
 
             days_offset = random.randint(-120, 14)
-            if status in (AppointmentStatus.SCHEDULED, AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION):
+            if status in (
+                AppointmentStatus.SCHEDULED,
+                AppointmentStatus.CHECKED_IN,
+                AppointmentStatus.IN_CONSULTATION,
+            ):
                 days_offset = random.randint(0, 14)
 
             scheduled_at = clinic_time(now, days_offset)
-            note = f"{demo_tag(suffix,'ap',str(seq))} | {c['complaint']}"
+            note = f"{demo_tag(suffix, 'ap', str(seq))} | {c['complaint']}"
 
             ap = Appointment(
                 patient_id=patient.id,
@@ -926,7 +1032,9 @@ def create_opd_appointments(
             _make_lifecycle_for_appointment(ap)
 
             if status == AppointmentStatus.CANCELLED:
-                ap.cancelled_reason = random.choice(["PATIENT_REQUEST", "DOCTOR_UNAVAILABLE", "OTHER"])
+                ap.cancelled_reason = random.choice(
+                    ["PATIENT_REQUEST", "DOCTOR_UNAVAILABLE", "OTHER"]
+                )
                 ap.cancelled_note = random.choice(cancel_notes)
 
             db.add(ap)
@@ -935,6 +1043,7 @@ def create_opd_appointments(
 
         db.commit()
         return appts
+
 
 # ----------------------------
 # Vitals
@@ -968,7 +1077,9 @@ def create_vitals_for_opd(
                 continue
 
             rby = random.choice(nurses_and_doctors)
-            when = (ap.checked_in_at or ap.scheduled_at) + timedelta(minutes=random.randint(0, 10))
+            when = (ap.checked_in_at or ap.scheduled_at) + timedelta(
+                minutes=random.randint(0, 10)
+            )
 
             v = Vital(
                 patient_id=ap.patient_id,
@@ -1011,7 +1122,11 @@ def create_vitals_for_ipd(
                 start = end - timedelta(days=21)
 
             days = max(1, int((end - start).days) + 1)
-            per_day = random.randint(2, 4) if ad.status == AdmissionStatus.ACTIVE else random.randint(1, 3)
+            per_day = (
+                random.randint(2, 4)
+                if ad.status == AdmissionStatus.ACTIVE
+                else random.randint(1, 3)
+            )
 
             max_records = 40
             produced_for_ad = 0
@@ -1064,11 +1179,15 @@ def create_vitals_for_ipd(
         db.commit()
         return created
 
+
 # ----------------------------
 # Prescriptions
 # ----------------------------
 
-def _apply_prescription_cancel_fields(rx: Prescription, *, reason: str, when: datetime) -> None:
+
+def _apply_prescription_cancel_fields(
+    rx: Prescription, *, reason: str, when: datetime
+) -> None:
     _safe_setattr(rx, "cancelled_reason", reason)
     _safe_setattr(rx, "cancelled_at", when)
 
@@ -1082,6 +1201,7 @@ def prescription_transition_plan() -> PrescriptionStatus:
             (PrescriptionStatus.CANCELLED, 0.12),
         ]
     )
+
 
 def create_prescriptions(
     db: Session,
@@ -1101,20 +1221,24 @@ def create_prescriptions(
     with tenant_scope(db, tenant.schema_name):
         already = (
             db.query(Prescription)
-            .filter(Prescription.chief_complaint.like(f"{demo_tag(suffix,'rx','%')}%"))
+            .filter(
+                Prescription.chief_complaint.like(f"{demo_tag(suffix, 'rx', '%')}%")
+            )
             .count()
         )
         if already >= limit:
             return (
                 db.query(Prescription)
-                .filter(Prescription.chief_complaint.like(f"{demo_tag(suffix,'rx','%')}%"))
+                .filter(
+                    Prescription.chief_complaint.like(f"{demo_tag(suffix, 'rx', '%')}%")
+                )
                 .limit(limit)
                 .all()
             )
 
-        med_stock = [s for s in stock_items if s.type == StockItemType.MEDICINE and s.is_active] or [
-            s for s in stock_items if s.type == StockItemType.MEDICINE
-        ]
+        med_stock = [
+            s for s in stock_items if s.type == StockItemType.MEDICINE and s.is_active
+        ] or [s for s in stock_items if s.type == StockItemType.MEDICINE]
 
         opd_candidates = [
             a
@@ -1131,7 +1255,9 @@ def create_prescriptions(
         now = utcnow()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
-        todays = [a for a in opd_candidates if today_start <= a.scheduled_at < today_end]
+        todays = [
+            a for a in opd_candidates if today_start <= a.scheduled_at < today_end
+        ]
         others = [a for a in opd_candidates if a not in todays]
         random.shuffle(todays)
         random.shuffle(others)
@@ -1158,7 +1284,8 @@ def create_prescriptions(
                     dosage=getattr(stock, "default_dosage", None) or "1 tab",
                     frequency=getattr(stock, "default_frequency", None) or "BD",
                     duration=getattr(stock, "default_duration", None) or "3 days",
-                    instructions=getattr(stock, "default_instructions", None) or "After food",
+                    instructions=getattr(stock, "default_instructions", None)
+                    or "After food",
                     quantity=qty,
                 )
                 rx.items.append(item)
@@ -1180,7 +1307,7 @@ def create_prescriptions(
                 appointment_id=ap.id,
                 admission_id=None,
                 status=status,
-                chief_complaint=f"{demo_tag(suffix,'rx',str(seq))} | {c['complaint']}",
+                chief_complaint=f"{demo_tag(suffix, 'rx', str(seq))} | {c['complaint']}",
                 diagnosis=c["diagnosis"],
             )
             db.add(rx)
@@ -1188,7 +1315,9 @@ def create_prescriptions(
             add_items(rx)
 
             if status == PrescriptionStatus.CANCELLED:
-                cancelled_when = (getattr(rx, "created_at", None) or utcnow()) + timedelta(minutes=random.randint(5, 180))
+                cancelled_when = (
+                    getattr(rx, "created_at", None) or utcnow()
+                ) + timedelta(minutes=random.randint(5, 180))
                 _apply_prescription_cancel_fields(
                     rx,
                     reason=random.choice(
@@ -1203,24 +1332,37 @@ def create_prescriptions(
                 )
 
             if status in (PrescriptionStatus.ISSUED, PrescriptionStatus.DISPENSED):
-                if ap.status not in (AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW):
+                if ap.status not in (
+                    AppointmentStatus.CANCELLED,
+                    AppointmentStatus.NO_SHOW,
+                ):
                     ap.status = AppointmentStatus.COMPLETED
                 if not ap.checked_in_at:
                     ap.checked_in_at = ap.scheduled_at + timedelta(minutes=5)
                 if not ap.consultation_started_at:
-                    ap.consultation_started_at = (ap.checked_in_at or ap.scheduled_at) + timedelta(minutes=10)
+                    ap.consultation_started_at = (
+                        ap.checked_in_at or ap.scheduled_at
+                    ) + timedelta(minutes=10)
                 if not ap.completed_at:
-                    ap.completed_at = (ap.consultation_started_at or ap.scheduled_at) + timedelta(minutes=20)
+                    ap.completed_at = (
+                        ap.consultation_started_at or ap.scheduled_at
+                    ) + timedelta(minutes=20)
 
             if status == PrescriptionStatus.DISPENSED:
                 for it in rx.items:
                     if it.stock_item_id and it.quantity:
-                        s = db.query(StockItem).filter(StockItem.id == it.stock_item_id).first()
+                        s = (
+                            db.query(StockItem)
+                            .filter(StockItem.id == it.stock_item_id)
+                            .first()
+                        )
                         if not s:
                             continue
                         if (s.current_stock or 0) < it.quantity:
                             it.quantity = max(0, int(s.current_stock or 0))
-                        s.current_stock = max(0, int(s.current_stock or 0) - int(it.quantity or 0))
+                        s.current_stock = max(
+                            0, int(s.current_stock or 0) - int(it.quantity or 0)
+                        )
 
             rx_list.append(rx)
 
@@ -1241,7 +1383,7 @@ def create_prescriptions(
                 appointment_id=None,
                 admission_id=ad.id,
                 status=status,
-                chief_complaint=f"{demo_tag(suffix,'rx',str(seq))} | IPD: {reason['reason']}",
+                chief_complaint=f"{demo_tag(suffix, 'rx', str(seq))} | IPD: {reason['reason']}",
                 diagnosis="Supportive care / monitor vitals",
             )
             db.add(rx)
@@ -1249,23 +1391,34 @@ def create_prescriptions(
             add_items(rx)
 
             if status == PrescriptionStatus.CANCELLED:
-                cancelled_when = (getattr(rx, "created_at", None) or utcnow()) + timedelta(minutes=random.randint(5, 180))
-                _apply_prescription_cancel_fields(rx, reason="Therapy changed", when=cancelled_when)
+                cancelled_when = (
+                    getattr(rx, "created_at", None) or utcnow()
+                ) + timedelta(minutes=random.randint(5, 180))
+                _apply_prescription_cancel_fields(
+                    rx, reason="Therapy changed", when=cancelled_when
+                )
 
             if status == PrescriptionStatus.DISPENSED:
                 for it in rx.items:
                     if it.stock_item_id and it.quantity:
-                        s = db.query(StockItem).filter(StockItem.id == it.stock_item_id).first()
+                        s = (
+                            db.query(StockItem)
+                            .filter(StockItem.id == it.stock_item_id)
+                            .first()
+                        )
                         if not s:
                             continue
                         if (s.current_stock or 0) < it.quantity:
                             it.quantity = max(0, int(s.current_stock or 0))
-                        s.current_stock = max(0, int(s.current_stock or 0) - int(it.quantity or 0))
+                        s.current_stock = max(
+                            0, int(s.current_stock or 0) - int(it.quantity or 0)
+                        )
 
             rx_list.append(rx)
 
         db.commit()
         return rx_list
+
 
 # ----------------------------
 # Reset + Freshen
@@ -1275,15 +1428,19 @@ def reset_demo_for_tenant(db: Session, tenant: Tenant, suffix: str) -> None:
     with tenant_scope(db, tenant.schema_name):
         patient_count = (
             db.query(Patient)
-            .filter(Patient.clinical_notes.like(f"{demo_tag(suffix,'patient','%')}%"))
+            .filter(Patient.clinical_notes.like(f"{demo_tag(suffix, 'patient', '%')}%"))
             .count()
         )
         appointment_count = (
-            db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(suffix,'ap','%')}%")).count()
+            db.query(Appointment)
+            .filter(Appointment.notes.like(f"{demo_tag(suffix, 'ap', '%')}%"))
+            .count()
         )
         prescription_count = (
             db.query(Prescription)
-            .filter(Prescription.chief_complaint.like(f"{demo_tag(suffix,'rx','%')}%"))
+            .filter(
+                Prescription.chief_complaint.like(f"{demo_tag(suffix, 'rx', '%')}%")
+            )
             .count()
         )
 
@@ -1296,41 +1453,53 @@ def reset_demo_for_tenant(db: Session, tenant: Tenant, suffix: str) -> None:
 
     # Delete records
     with tenant_scope(db, tenant.schema_name):
-        db.query(Vital).filter(Vital.notes.like(f"{demo_tag(suffix,'vt_%','%')}%")).delete(synchronize_session=False)
+        db.query(Vital).filter(
+            Vital.notes.like(f"{demo_tag(suffix, 'vt_%', '%')}%")
+        ).delete(synchronize_session=False)
 
         rx_ids = (
             db.query(Prescription.id)
-            .filter(Prescription.chief_complaint.like(f"{demo_tag(suffix,'rx','%')}%"))
+            .filter(
+                Prescription.chief_complaint.like(f"{demo_tag(suffix, 'rx', '%')}%")
+            )
             .all()
         )
         rx_ids_flat = [r[0] for r in rx_ids]
         if rx_ids_flat:
-            db.query(PrescriptionItem).filter(PrescriptionItem.prescription_id.in_(rx_ids_flat)).delete(
-                synchronize_session=False
-            )
+            db.query(PrescriptionItem).filter(
+                PrescriptionItem.prescription_id.in_(rx_ids_flat)
+            ).delete(synchronize_session=False)
 
-        db.query(Prescription).filter(Prescription.chief_complaint.like(f"{demo_tag(suffix,'rx','%')}%")).delete(
+        db.query(Prescription).filter(
+            Prescription.chief_complaint.like(f"{demo_tag(suffix, 'rx', '%')}%")
+        ).delete(synchronize_session=False)
+        db.query(Appointment).filter(
+            Appointment.notes.like(f"{demo_tag(suffix, 'ap', '%')}%")
+        ).delete(synchronize_session=False)
+        db.query(Admission).filter(
+            Admission.notes.like(f"{demo_tag(suffix, 'ad', '%')}%")
+        ).delete(synchronize_session=False)
+        db.query(StockItem).filter(StockItem.name.like(f"Demo {suffix} - %")).delete(
             synchronize_session=False
         )
-        db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(suffix,'ap','%')}%")).delete(
-            synchronize_session=False
-        )
-        db.query(Admission).filter(Admission.notes.like(f"{demo_tag(suffix,'ad','%')}%")).delete(
-            synchronize_session=False
-        )
-        db.query(StockItem).filter(StockItem.name.like(f"Demo {suffix} - %")).delete(synchronize_session=False)
-        db.query(Patient).filter(Patient.clinical_notes.like(f"{demo_tag(suffix,'patient','%')}%")).delete(
-            synchronize_session=False
-        )
+        db.query(Patient).filter(
+            Patient.clinical_notes.like(f"{demo_tag(suffix, 'patient', '%')}%")
+        ).delete(synchronize_session=False)
 
-    users = db.query(User).filter(
-        User.tenant_id == tenant.id,
-        User.email.like(f"%{demo_email_domain}"),
-    ).all()
+    users = (
+        db.query(User)
+        .filter(
+            User.tenant_id == tenant.id,
+            User.email.like(f"%{demo_email_domain}"),
+        )
+        .all()
+    )
 
     with tenant_scope(db, tenant.schema_name):
         for u in users:
-            db.query(TenantUserRole).filter(TenantUserRole.user_id == u.id).delete(synchronize_session=False)
+            db.query(TenantUserRole).filter(TenantUserRole.user_id == u.id).delete(
+                synchronize_session=False
+            )
 
     db.execute(
         text(
@@ -1357,39 +1526,55 @@ def reset_demo_for_tenant(db: Session, tenant: Tenant, suffix: str) -> None:
 
     # Decrement metrics
     try:
+
         def _do_metrics(dbm: Session) -> None:
             from app.services.tenant_metrics_service import get_or_create_metrics
 
             metrics = get_or_create_metrics(dbm)
 
             if patient_count > 0:
-                metrics.total_patients = max(0, (metrics.total_patients or 0) - patient_count)
+                metrics.total_patients = max(
+                    0, (metrics.total_patients or 0) - patient_count
+                )
             if appointment_count > 0:
-                metrics.total_appointments = max(0, (metrics.total_appointments or 0) - appointment_count)
+                metrics.total_appointments = max(
+                    0, (metrics.total_appointments or 0) - appointment_count
+                )
             if prescription_count > 0:
-                metrics.total_prescriptions = max(0, (metrics.total_prescriptions or 0) - prescription_count)
+                metrics.total_prescriptions = max(
+                    0, (metrics.total_prescriptions or 0) - prescription_count
+                )
             if user_count > 0:
                 metrics.total_users = max(0, (metrics.total_users or 0) - user_count)
 
         _run_public_metrics(_do_metrics)
 
     except Exception as e:
-        logger.warning(f"Failed to decrement metrics during reset (non-critical): {e}", exc_info=True)
+        logger.warning(
+            f"Failed to decrement metrics during reset (non-critical): {e}",
+            exc_info=True,
+        )
 
 
-def freshen_demo_for_tenant(db: Session, tenant: Tenant, suffix: str, shift_days: int) -> dict[str, int]:
+def freshen_demo_for_tenant(
+    db: Session, tenant: Tenant, suffix: str, shift_days: int
+) -> dict[str, int]:
     """
     Freshen demo data by shifting dates forward uniformly.
     Maintains relative timestamp ordering and shifts related entities (prescriptions, linked admissions).
     Uses tenant_scope to ensure proper schema selection for all tenant-scoped entities.
     """
     delta = timedelta(days=shift_days)
-    
+
     with tenant_scope(db, tenant.schema_name):
         # 1. Shift appointments and collect their IDs for related entity updates
-        appts = db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(suffix,'ap','%')}%")).all()
+        appts = (
+            db.query(Appointment)
+            .filter(Appointment.notes.like(f"{demo_tag(suffix, 'ap', '%')}%"))
+            .all()
+        )
         appointment_ids = [a.id for a in appts]
-        
+
         for a in appts:
             a.scheduled_at = in_15_min_block(a.scheduled_at + delta)
             if a.checked_in_at:
@@ -1404,9 +1589,11 @@ def freshen_demo_for_tenant(db: Session, tenant: Tenant, suffix: str, shift_days
         # 2. Shift prescriptions linked to appointments (within tenant scope)
         prescriptions = []
         if appointment_ids:
-            prescriptions = db.query(Prescription).filter(
-                Prescription.appointment_id.in_(appointment_ids)
-            ).all()
+            prescriptions = (
+                db.query(Prescription)
+                .filter(Prescription.appointment_id.in_(appointment_ids))
+                .all()
+            )
             for rx in prescriptions:
                 rx.created_at = rx.created_at + delta
                 if rx.cancelled_at:
@@ -1415,14 +1602,22 @@ def freshen_demo_for_tenant(db: Session, tenant: Tenant, suffix: str, shift_days
         # 3. Shift all admissions (all are in tenant scope, including those linked to appointments)
         # Note: Admissions linked to appointments via source_opd_appointment_id are also shifted
         # to maintain logical consistency (admission happened after appointment that triggered it)
-        ads = db.query(Admission).filter(Admission.notes.like(f"{demo_tag(suffix,'ad','%')}%")).all()
+        ads = (
+            db.query(Admission)
+            .filter(Admission.notes.like(f"{demo_tag(suffix, 'ad', '%')}%"))
+            .all()
+        )
         for ad in ads:
             ad.admit_datetime = ad.admit_datetime + delta
             if ad.discharge_datetime:
                 ad.discharge_datetime = ad.discharge_datetime + delta
 
         # 5. Shift vitals (within tenant scope)
-        vs = db.query(Vital).filter(Vital.notes.like(f"{demo_tag(suffix,'vt_%','%')}%")).all()
+        vs = (
+            db.query(Vital)
+            .filter(Vital.notes.like(f"{demo_tag(suffix, 'vt_%', '%')}%"))
+            .all()
+        )
         for v in vs:
             v.recorded_at = v.recorded_at + delta
 
@@ -1433,6 +1628,7 @@ def freshen_demo_for_tenant(db: Session, tenant: Tenant, suffix: str, shift_days
             "vitals": len(vs),
             "prescriptions": len(prescriptions),
         }
+
 
 # ----------------------------
 # Main seeding orchestration
@@ -1450,22 +1646,35 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
         with public_scope(db):
             existing_user_count = (
                 db.query(User)
-                .filter(User.tenant_id == tenant.id, User.email.like(f"%{demo_email_domain}"))
+                .filter(
+                    User.tenant_id == tenant.id,
+                    User.email.like(f"%{demo_email_domain}"),
+                )
                 .count()
             )
 
         with tenant_scope(db, tenant.schema_name):
             existing_patients_before = (
                 db.query(Patient)
-                .filter(Patient.clinical_notes.like(f"{demo_tag(spec.suffix,'patient','%')}%"))
+                .filter(
+                    Patient.clinical_notes.like(
+                        f"{demo_tag(spec.suffix, 'patient', '%')}%"
+                    )
+                )
                 .count()
             )
             existing_appointments_before = (
-                db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(spec.suffix,'ap','%')}%")).count()
+                db.query(Appointment)
+                .filter(Appointment.notes.like(f"{demo_tag(spec.suffix, 'ap', '%')}%"))
+                .count()
             )
             existing_prescriptions_before = (
                 db.query(Prescription)
-                .filter(Prescription.chief_complaint.like(f"{demo_tag(spec.suffix,'rx','%')}%"))
+                .filter(
+                    Prescription.chief_complaint.like(
+                        f"{demo_tag(spec.suffix, 'rx', '%')}%"
+                    )
+                )
                 .count()
             )
 
@@ -1478,7 +1687,9 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
         with tenant_scope(db, tenant.schema_name):
             departments = db.query(Department).all()
 
-        stock = upsert_stock_catalog(db, tenant, spec.suffix, created_by_id=staff["HOSPITAL_ADMIN"].id)
+        stock = upsert_stock_catalog(
+            db, tenant, spec.suffix, created_by_id=staff["HOSPITAL_ADMIN"].id
+        )
 
         patients = upsert_patients(
             db,
@@ -1489,12 +1700,16 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
         )
 
         ipd_patients, _ = split_patients_for_ipd(patients, ipd_count=60)
-        admissions = create_ipd_admissions(db, tenant, spec.suffix, ipd_patients, doctors, departments, count=200)
+        admissions = create_ipd_admissions(
+            db, tenant, spec.suffix, ipd_patients, doctors, departments, count=200
+        )
 
         with tenant_scope(db, tenant.schema_name):
             active_ipd_patient_ids = {
                 pid
-                for (pid,) in db.query(Admission.patient_id).filter(Admission.status == AdmissionStatus.ACTIVE).all()
+                for (pid,) in db.query(Admission.patient_id)
+                .filter(Admission.status == AdmissionStatus.ACTIVE)
+                .all()
             }
 
         # Build the list while we *know* search_path is correct
@@ -1509,7 +1724,9 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
             count=500,
         )
 
-        v_opd = create_vitals_for_opd(db, tenant, spec.suffix, appointments, nurse_or_doc)
+        v_opd = create_vitals_for_opd(
+            db, tenant, spec.suffix, appointments, nurse_or_doc
+        )
         v_ipd = create_vitals_for_ipd(db, tenant, spec.suffix, admissions, nurse_or_doc)
 
         rx = create_prescriptions(
@@ -1528,30 +1745,48 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
         with tenant_scope(db, tenant.schema_name):
             total_patients_after = (
                 db.query(Patient)
-                .filter(Patient.clinical_notes.like(f"{demo_tag(spec.suffix,'patient','%')}%"))
+                .filter(
+                    Patient.clinical_notes.like(
+                        f"{demo_tag(spec.suffix, 'patient', '%')}%"
+                    )
+                )
                 .count()
             )
             total_appointments_after = (
-                db.query(Appointment).filter(Appointment.notes.like(f"{demo_tag(spec.suffix,'ap','%')}%")).count()
+                db.query(Appointment)
+                .filter(Appointment.notes.like(f"{demo_tag(spec.suffix, 'ap', '%')}%"))
+                .count()
             )
             total_prescriptions_after = (
                 db.query(Prescription)
-                .filter(Prescription.chief_complaint.like(f"{demo_tag(spec.suffix,'rx','%')}%"))
+                .filter(
+                    Prescription.chief_complaint.like(
+                        f"{demo_tag(spec.suffix, 'rx', '%')}%"
+                    )
+                )
                 .count()
             )
             total_user_count_after = (
                 db.query(User)
-                .filter(User.tenant_id == tenant.id, User.email.like(f"%{demo_email_domain}"))
+                .filter(
+                    User.tenant_id == tenant.id,
+                    User.email.like(f"%{demo_email_domain}"),
+                )
                 .count()
             )
 
         new_user_count = max(0, total_user_count_after - existing_user_count)
         new_patient_count = max(0, total_patients_after - existing_patients_before)
-        new_appointment_count = max(0, total_appointments_after - existing_appointments_before)
-        new_prescription_count = max(0, total_prescriptions_after - existing_prescriptions_before)
+        new_appointment_count = max(
+            0, total_appointments_after - existing_appointments_before
+        )
+        new_prescription_count = max(
+            0, total_prescriptions_after - existing_prescriptions_before
+        )
 
         # Increment metrics
         try:
+
             def _do_metrics(dbm: Session) -> None:
                 if new_patient_count > 0:
                     increment_patients(dbm, new_patient_count)
@@ -1565,7 +1800,10 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
             _run_public_metrics(_do_metrics)
 
         except Exception as e:
-            logger.warning(f"Failed to increment metrics during seed (non-critical): {e}", exc_info=True)
+            logger.warning(
+                f"Failed to increment metrics during seed (non-critical): {e}",
+                exc_info=True,
+            )
 
         print(f"Patients: {len(patients)} (new: {new_patient_count})")
         print(f"Appointments: {len(appointments)} (new: {new_appointment_count})")
@@ -1593,6 +1831,7 @@ def seed_one_tenant(spec: DemoTenantSpec) -> None:
 
 
 def seed_two_tenants() -> None:
+    emit_progress(5, "Initializing...")
     specs = [
         DemoTenantSpec(
             suffix="A",
@@ -1607,9 +1846,17 @@ def seed_two_tenants() -> None:
     ]
 
     failures: list[tuple[str, str]] = []
-    for spec in specs:
+    for idx, spec in enumerate(specs):
         try:
+            if idx == 0:
+                emit_progress(15, "Tenant A: seeding...")
+            elif idx == 1:
+                emit_progress(55, "Tenant B: seeding...")
             seed_one_tenant(spec)
+            if idx == 0:
+                emit_progress(50, "Tenant A: done")
+            elif idx == 1:
+                emit_progress(90, "Tenant B: done")
         except Exception as e:
             _log_db_error(e)
             failures.append((spec.suffix, str(e)))
@@ -1617,13 +1864,24 @@ def seed_two_tenants() -> None:
     if failures:
         raise RuntimeError(f"Seed finished with failures: {failures}")
 
+    emit_progress(95, "Finalizing...")
+    emit_progress(100, "Completed")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed / reset / freshen HMS demo data")
-    parser.add_argument("--seed", action="store_true", help="Seed demo tenants and realistic demo data")
-    parser.add_argument("--reset", action="store_true", help="Delete demo data for demo tenants only")
-    parser.add_argument("--freshen", action="store_true", help="Time-shift demo data forward")
-    parser.add_argument("--freshen-days", type=int, default=7, help="Days to shift forward (default: 7)")
+    parser.add_argument(
+        "--seed", action="store_true", help="Seed demo tenants and realistic demo data"
+    )
+    parser.add_argument(
+        "--reset", action="store_true", help="Delete demo data for demo tenants only"
+    )
+    parser.add_argument(
+        "--freshen", action="store_true", help="Time-shift demo data forward"
+    )
+    parser.add_argument(
+        "--freshen-days", type=int, default=7, help="Days to shift forward (default: 7)"
+    )
     args = parser.parse_args()
 
     if not (args.seed or args.reset or args.freshen):
@@ -1644,35 +1902,72 @@ def main() -> None:
             db.close()
 
     if args.reset:
-        for suffix, lic in [("A", DEMO_TENANT_A_LICENSE), ("B", DEMO_TENANT_B_LICENSE)]:
+        reset_tenants = [("A", DEMO_TENANT_A_LICENSE), ("B", DEMO_TENANT_B_LICENSE)]
+        for idx, (suffix, lic) in enumerate(reset_tenants):
 
-            def _do_reset(db: Session) -> None:
-                tenant = db.query(Tenant).filter(Tenant.license_number == lic).first()
+            def _do_reset(
+                db: Session, tenant_suffix: str, tenant_lic: str, tenant_idx: int
+            ) -> None:
+                tenant = (
+                    db.query(Tenant).filter(Tenant.license_number == tenant_lic).first()
+                )
                 if not tenant:
-                    print(f"Tenant {suffix} not found, skipping reset.")
+                    print(f"Tenant {tenant_suffix} not found, skipping reset.")
                     return
-                print(f"\nResetting Tenant {suffix} ({tenant.schema_name})...")
-                reset_demo_for_tenant(db, tenant, suffix)
+                if tenant_idx == 0:
+                    emit_progress(10, "Tenant A: resetting...")
+                elif tenant_idx == 1:
+                    emit_progress(60, "Tenant B: resetting...")
+                print(f"\nResetting Tenant {tenant_suffix} ({tenant.schema_name})...")
+                reset_demo_for_tenant(db, tenant, tenant_suffix)
+                if tenant_idx == 0:
+                    emit_progress(50, "Tenant A: done")
+                elif tenant_idx == 1:
+                    emit_progress(90, "Tenant B: done")
                 print("Reset done.")
 
-            _with_fresh_session(_do_reset)
+            _with_fresh_session(lambda db: _do_reset(db, suffix, lic, idx))
+        emit_progress(95, "Finalizing...")
+        emit_progress(100, "Completed")
 
     if args.seed:
         seed_two_tenants()
 
     if args.freshen:
-        for suffix, lic in [("A", DEMO_TENANT_A_LICENSE), ("B", DEMO_TENANT_B_LICENSE)]:
+        freshen_tenants = [("A", DEMO_TENANT_A_LICENSE), ("B", DEMO_TENANT_B_LICENSE)]
+        for idx, (suffix, lic) in enumerate(freshen_tenants):
 
-            def _do_freshen(db: Session) -> None:
-                tenant = db.query(Tenant).filter(Tenant.license_number == lic).first()
+            def _do_freshen(
+                db: Session,
+                tenant_suffix: str,
+                tenant_lic: str,
+                tenant_idx: int,
+                shift_days: int,
+            ) -> None:
+                tenant = (
+                    db.query(Tenant).filter(Tenant.license_number == tenant_lic).first()
+                )
                 if not tenant:
-                    print(f"Tenant {suffix} not found, skipping freshen.")
+                    print(f"Tenant {tenant_suffix} not found, skipping freshen.")
                     return
-                print(f"\nFreshening Tenant {suffix} by {args.freshen_days} days...")
-                stats = freshen_demo_for_tenant(db, tenant, suffix, shift_days=args.freshen_days)
+                if tenant_idx == 0:
+                    emit_progress(10, "Tenant A: freshening...")
+                print(f"\nFreshening Tenant {tenant_suffix} by {shift_days} days...")
+                stats = freshen_demo_for_tenant(
+                    db, tenant, tenant_suffix, shift_days=shift_days
+                )
+                if tenant_idx == 0:
+                    emit_progress(50, "Tenant A: done")
+                elif tenant_idx == 1:
+                    emit_progress(60, "Tenant B: freshening...")
+                    emit_progress(90, "Tenant B: done")
                 print(f"Freshened: {stats}")
 
-            _with_fresh_session(_do_freshen)
+            _with_fresh_session(
+                lambda db: _do_freshen(db, suffix, lic, idx, args.freshen_days)
+            )
+        emit_progress(95, "Finalizing...")
+        emit_progress(100, "Completed")
 
 
 if __name__ == "__main__":
