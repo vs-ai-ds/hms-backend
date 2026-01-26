@@ -12,6 +12,7 @@ import app.models.public
 from app.models.base import Base
 
 # Import VerificationToken model so Alembic can detect it (public schema)
+from app.utils.token_utils import VerificationToken
 
 # This is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
