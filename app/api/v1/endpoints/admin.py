@@ -51,31 +51,18 @@ def _acquire_advisory_lock(db: Session, lock_id: int) -> bool:
     Must not leave the session in an aborted transaction state.
     """
     try:
-        row = db.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": lock_id}).first()
-        return bool(row[0]) if row else False
+        val = db.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_id)"),
+            {"lock_id": lock_id},
+        ).scalar()
+        return bool(val)
     except Exception as e:
-        logger.warning("Failed to acquire advisory lock (treat as not acquired): %s", e, exc_info=True)
+        logger.warning("Failed to acquire advisory xact lock (treat as not acquired): %s", e, exc_info=True)
         try:
             db.rollback()
         except Exception:
             pass
         return False
-
-
-def _release_advisory_lock(db: Session, lock_id: int) -> None:
-    """Release a Postgres advisory lock."""
-    try:
-        try:
-            db.rollback()
-        except Exception:
-            pass
-
-        db.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id})
-
-    except (OperationalError, DBAPIError) as e:
-            logger.warning("Failed to release advisory lock (non-fatal): %s", e, exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to release advisory lock (non-fatal): %s", e, exc_info=True)
 
 
 def _run_seed_script(action: str, freshen_days: Optional[int] = None) -> tuple[bool, str]:
@@ -165,19 +152,7 @@ def refresh_demo_data(
             detail="Action must be 'seed', 'freshen', or 'reset'",
         )
 
-    acquired = False
-    # Try to acquire lock (non-blocking)
-    try:
-        acquired = _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
-    except Exception as e:
-        # If lock acquisition itself fails, treat as infra error
-        logger.warning(f"Failed to acquire advisory lock: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database lock acquisition failed. Please retry.",
-        )
-
-    if not acquired:
+    if not _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Demo refresh already running. Please wait for the current operation to complete.",
@@ -209,9 +184,6 @@ def refresh_demo_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred during demo refresh. Check server logs for details.",
         )
-    finally:
-        if acquired:
-            _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
 
 
 def check_and_freshen_demo_on_login(db: Session) -> None:
@@ -240,16 +212,11 @@ def check_and_freshen_demo_on_login(db: Session) -> None:
         return
 
     # Try to acquire lock (non-blocking)
-    acquired = False
-    try:
-        acquired = _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
-    except Exception as e:
-        logger.debug(f"Demo auto-freshen skipped: lock acquire failed: {e}")
-        return
-
-    if not acquired:
-        logger.debug("Demo auto-freshen skipped: lock already held by another process")
-        return
+    if not _acquire_advisory_lock(db, DEMO_REFRESH_LOCK_ID):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Demo refresh already running. Please wait for the current operation to complete.",
+        )
 
     try:
         # Run freshen with default days
@@ -264,7 +231,4 @@ def check_and_freshen_demo_on_login(db: Session) -> None:
 
     except Exception as e:
         logger.error(f"Error during demo auto-freshen: {e}", exc_info=True)
-    finally:
-        if acquired:
-            _release_advisory_lock(db, DEMO_REFRESH_LOCK_ID)
 

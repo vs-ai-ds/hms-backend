@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
@@ -396,9 +396,8 @@ def get_dashboard_metrics(
                     Appointment.scheduled_at < today_end,
                     Appointment.status.in_([AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_CONSULTATION]),
                     ~Appointment.id.in_(
-                        db.query(Vital.appointment_id)
-                        .filter(func.date(Vital.recorded_at) == today_start.date())
-                        .subquery()
+                        select(Vital.appointment_id)
+                        .where(func.date(Vital.recorded_at) == today_start.date())
                     ),
                 )
                 .count()
@@ -427,7 +426,7 @@ def get_dashboard_metrics(
             Appointment.checked_in_at.isnot(None),
             Appointment.checked_in_at < incomplete_threshold,
             ~Appointment.id.in_(
-                db.query(Prescription.appointment_id).filter(Prescription.appointment_id.isnot(None)).subquery()
+                select(Prescription.appointment_id).where(Prescription.appointment_id.isnot(None))
             ),
         )
         .scalar()
